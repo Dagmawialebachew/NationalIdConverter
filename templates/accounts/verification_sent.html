@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Verify Your Email — Fayda Converter{% endblock %}
+
+{% block content %}
+<div class="min-h-[85vh] flex items-center justify-center px-4 py-16">
+
+  <div class="fixed inset-0 pointer-events-none">
+    <div class="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[500px] rounded-full"
+         style="background: radial-gradient(ellipse, #C9A84C06 0%, transparent 70%);"></div>
+  </div>
+
+  <div class="relative w-full max-w-md">
+    <div class="glass-card rounded-3xl p-10 text-center" style="animation: glowPulse 4s ease-in-out infinite;">
+      
+      <div class="w-14 h-14 rounded-full border border-gold/30 flex items-center justify-center mx-auto mb-6"
+           style="background: radial-gradient(circle at 40% 35%, #C9A84C18, transparent);">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C9A84C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect width="20" height="16" x="2" y="4" rx="2"/>
+          <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+        </svg>
+      </div>
+
+      <h1 class="font-display text-3xl text-ivory mb-3">Verify your email</h1>
+      <p class="text-gold text-sm font-medium mb-6 tracking-wide">Activation Link Transmitted</p>
+      
+      <div class="space-y-4 text-ivory-dim text-sm leading-relaxed border-t border-b border-white/5 py-6 my-6">
+        <p>
+          We have sent a secure authentication link to your email address. Follow the link provided to finalize your registration profile.
+        </p>
+        <p class="text-xs text-ivory-dim/60">
+          If you do not see the message within a few moments, please check your <strong class="text-ivory-dim">Spam or Updates</strong> folder.
+        </p>
+      </div>
+
+      <p class="text-center text-ivory-dim/50 text-xs tracking-wide">
+        Stuck? Check spam or contact support if the link fails to arrive.
+      </p>
+    </div>
+  </div>
+</div>
+{% endblock %}

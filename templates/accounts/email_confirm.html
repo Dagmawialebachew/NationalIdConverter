@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% load account %}
+{% block title %}Confirm Email Address — Fayda Converter{% endblock %}
+
+{% block content %}
+<div class="min-h-[85vh] flex items-center justify-center px-4 py-16">
+
+  <div class="fixed inset-0 pointer-events-none">
+    <div class="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[500px] rounded-full"
+         style="background: radial-gradient(ellipse, #C9A84C06 0%, transparent 70%);"></div>
+  </div>
+
+  <div class="relative w-full max-w-md">
+    <div class="glass-card rounded-3xl p-10 text-center">
+
+      {% if confirmation %}
+        {% user_display confirmation.email_address.user as user_display %}
+        
+        <div class="w-14 h-14 rounded-full border border-gold/30 flex items-center justify-center mx-auto mb-6"
+             style="background: radial-gradient(circle at 40% 35%, #C9A84C18, transparent);">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C9A84C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+            <polyline points="22 4 12 14.01 9 11.01"/>
+          </svg>
+        </div>
+
+        <h1 class="font-display text-3xl text-ivory mb-2">Confirm Identity</h1>
+        <p class="text-ivory-dim text-sm mb-6 leading-relaxed">
+          Please validate that <span class="text-gold font-medium">{{ confirmation.email_address.email }}</span> is linked to your dashboard workspace.
+        </p>
+
+        <form method="post" action="{% url 'account_confirm_email' confirmation.key %}" class="mt-4">
+          {% csrf_token %}
+          <button type="submit" class="btn-gold w-full py-3.5 rounded-xl text-sm font-medium tracking-wide">
+            <span>Confirm & Activate Credits</span>
+          </button>
+        </form>
+
+      {% else %}
+        
+        <div class="w-14 h-14 rounded-full border border-red-500/30 flex items-center justify-center mx-auto mb-6"
+             style="background: radial-gradient(circle at 40% 35%, rgba(239, 68, 68, 0.1), transparent);">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" x2="12" y1="8" y2="12"/>
+            <line x1="12" x2="12.01" y1="16" y2="16"/>
+          </svg>
+        </div>
+
+        <h1 class="font-display text-2xl text-ivory mb-2">Activation Link Expired</h1>
+        <p class="text-ivory-dim text-sm mb-6 leading-relaxed">
+          This security signature token is invalid or has timed out.
+        </p>
+
+        <a href="{% url 'account_email' %}" class="btn-gold w-full py-3.5 rounded-xl text-sm font-medium tracking-wide inline-block">
+          <span>Request New Link</span>
+        </a>
+      {% endif %}
+
+    </div>
+  </div>
+</div>
+{% endblock %}

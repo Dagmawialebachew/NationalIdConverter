@@ -509,22 +509,28 @@ def _resolve_output_zones(output_zones: dict):
 
 
 # Insert directly below BACK_ZONES definition
+import io
+from PIL import Image, ImageDraw, ImageFont
 
 def apply_amharic_watermark(image_bytes: bytes) -> bytes:
     """
-    Applies a semi-transparent Amharic watermark on-the-fly.
-    Operates strictly in memory via bytes for maximum processing speed.
+    Applies a semi-transparent, diagonally rotated Amharic & English watermark.
+    Operates strictly in memory via bytes for maximum low-latency processing.
     """
     img = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
-    txt_layer = Image.new("RGBA", img.size, (255, 255, 255, 0))
-    draw = ImageDraw.Draw(txt_layer)
+    W, H = img.size
+    
+    # Create an independent transparent layer for compiling our watermarks
+    watermark_layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
     
     # Pre-calculated safe system font paths
     font_paths = ["Nyala.ttf", "AbyssinicaSIL-R.ttf", "AbyssinicaSIL.ttf", "arialbd.ttf", "FreeSansBold.ttf"]
     font = None
+    font_size = 65  # Increased slightly from 55 to maximize visual distinction
+    
     for path in font_paths:
         try:
-            font = ImageFont.truetype(path, 55)
+            font = ImageFont.truetype(path, font_size)
             break
         except Exception:
             continue
@@ -532,26 +538,63 @@ def apply_amharic_watermark(image_bytes: bytes) -> bytes:
     if not font:
         font = ImageFont.load_default()
         
-    h = img.size[1]
-    text_amharic = "ናሙና"
-    text_english = "PREVIEW ONLY"
     is_default = (font.__class__.__name__ == 'ImageDefaultFont')
     
-    # Exact center points of Front (590px) and Back (1770px) hemispheres
+    text_amharic = "ናሙና"
+    text_english = "PREVIEW ONLY"
+    if is_default:
+        text_amharic = "SAMPLE PROOF"  # Clean fallback string if system font lacks Amharic character maps
+        
+    # ─── AESTHETIC CONTROLS ───────────────────────────────────────────────────
+    ANGLE = 35        # Counter-clockwise rotation angle (degrees)
+    OPACITY = 42      # Text opacity level (0 = completely transparent, 255 = fully opaque)
+    COLOR_HEX = (20, 24, 33, OPACITY) # Premium deep charcoal theme
+    
+    # ─── GENERATE ROTATED WATERMARK STAMP ─────────────────────────────────────
+    # We use a standalone square canvas to hold and rotate the text cleanly without edge clips
+    stamp_size = 600
+    stamp = Image.new("RGBA", (stamp_size, stamp_size), (0, 0, 0, 0))
+    stamp_draw = ImageDraw.Draw(stamp)
+    
+    # Calculate geometric sizing boundaries for precise layout centering
+    if hasattr(font, 'getbbox'):
+        bx1, by1, bx2, by2 = font.getbbox(text_amharic)
+        w1, h1 = bx2 - bx1, by2 - by1
+        bx1, by1, bx2, by2 = font.getbbox(text_english)
+        w2, h2 = bx2 - bx1, by2 - by1
+    else:
+        # Backward compatibility fallback for legacy versions
+        w1, h1 = stamp_draw.textsize(text_amharic, font=font) if hasattr(stamp_draw, 'textsize') else (160, 45)
+        w2, h2 = stamp_draw.textsize(text_english, font=font) if hasattr(stamp_draw, 'textsize') else (260, 45)
+
+    # Render lines stacked and centered on our temporary stamp canvas
+    x1 = (stamp_size - w1) // 2
+    y1 = (stamp_size // 2) - h1 - 12  # Amharic line positioned above middle axis
+    stamp_draw.text((x1, y1), text_amharic, fill=COLOR_HEX, font=font)
+    
+    x2 = (stamp_size - w2) // 2
+    y2 = (stamp_size // 2) + 12       # English line positioned below middle axis
+    stamp_draw.text((x2, y2), text_english, fill=COLOR_HEX, font=font)
+    
+    # Apply crisp diagonal rotation layer transform
+    rotated_stamp = stamp.rotate(ANGLE, resample=Image.BICUBIC)
+    
+    # ─── POSITION STAMP ON MAIN CANVAS HEMISPHERES ────────────────────────────
+    # Exact center focal points for Front (590px) and Back (1770px) layout halves
     centers = [590, 1770]
     for cx in centers:
-        if is_default:
-            draw.text((cx - 180, h // 2 - 30), "SAMPLE PROOF", fill=(20, 24, 33, 40))
-            draw.text((cx - 180, h // 2 + 10), "PREVIEW ONLY", fill=(20, 24, 33, 40))
-        else:
-            # High-end charcoal tone at ~15% opacity overlay
-            draw.text((cx - 60, h // 2 - 50), text_amharic, fill=(20, 24, 33, 38), font=font)
-            draw.text((cx - 160, h // 2 + 15), text_english, fill=(20, 24, 33, 38), font=font)
-            
-    composite = Image.alpha_composite(img, txt_layer).convert("RGB")
+        # Offset positioning vectors so stamp centers sit precisely over target targets
+        paste_x = cx - (stamp_size // 2)
+        paste_y = (H // 2) - (stamp_size // 2)
+        watermark_layer.paste(rotated_stamp, (paste_x, paste_y), rotated_stamp)
+        
+    # Merge transparent layers back together and compile optimized output
+    composite = Image.alpha_composite(img, watermark_layer).convert("RGB")
     output_buffer = io.BytesIO()
     composite.save(output_buffer, format="JPEG", quality=95, optimize=True)
+    
     return output_buffer.getvalue()
+
 
 
 def extract_slices(
