@@ -28,14 +28,23 @@ env = environ.Env()
 
 # ─── Security ─────────────────────────────────────────────────────────────────
 DEBUG         = False
-ALLOWED_HOSTS = env.list("ALLOWED_HOSTS")
 
+# 1. Read from Render Dashboard (default to empty list if unset)
+ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=[])
 
+# 2. Clean spaces/quotes if accidentally pasted into the dashboard string
+ALLOWED_HOSTS = [host.strip().replace("'", "").replace('"', "") for host in ALLOWED_HOSTS if host.strip()]
+
+# 3. Hardcode absolute fallbacks to guarantee uptime regardless of environment propagation
+ALLOWED_HOSTS.append("nationalidconverter.onrender.com")
+ALLOWED_HOSTS.append(".onrender.com")  # Django wildcard: authorizes ALL subdomains on render.com
+ALLOWED_HOSTS.extend(["localhost", "127.0.0.1"])
+
+# 4. Automated fallback capture tracking
 import os
 RENDER_EXTERNAL_HOSTNAME = os.environ.get("RENDER_EXTERNAL_HOSTNAME")
 if RENDER_EXTERNAL_HOSTNAME and RENDER_EXTERNAL_HOSTNAME not in ALLOWED_HOSTS:
-    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
-
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME.strip())
 # HTTPS enforcement
 SECURE_SSL_REDIRECT               = True
 SECURE_HSTS_SECONDS               = 31536000     # 1 year
