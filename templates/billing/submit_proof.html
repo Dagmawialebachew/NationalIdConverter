@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Verify Payment — Fayda ID Converter{% endblock %}
+
+{% block content %}
+<section class="relative min-h-[90vh] flex items-center justify-center py-20 overflow-hidden">
+  
+  <!-- Radial Glow Behind Card -->
+  <div class="absolute inset-0 pointer-events-none z-0">
+    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full"
+         style="background: radial-gradient(circle, #C9A84C0A 0%, transparent 70%);"></div>
+  </div>
+
+  <div class="relative w-full max-w-xl mx-auto px-6 z-10">
+    
+    <!-- Breadcrumb / Back Link -->
+    <div class="reveal reveal-1 mb-6">
+      <a href="{% url 'landing:index' %}#pricing" class="inline-flex items-center gap-2 text-ivory-dim hover:text-gold text-xs tracking-widest uppercase transition-colors">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path d="M9 11L4 7L9 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Back to Plans
+      </a>
+    </div>
+
+    <!-- Main Glass Card Container -->
+    <div class="glass-card rounded-3xl p-8 md:p-10 reveal reveal-2 shadow-2xl relative overflow-hidden">
+      
+      <!-- Subtle internal shimmer border effect -->
+      <div class="absolute inset-0 bg-gradient-to-b from-white/[0.02] to-transparent pointer-events-none"></div>
+
+      <!-- Header Section -->
+      <div class="mb-8">
+        <p class="text-gold text-xs tracking-[0.2em] uppercase font-medium mb-2">Manual Bank Transfer</p>
+        <h1 class="font-display text-3xl md:text-4xl text-ivory">
+          Upload Payment <em class="text-gold-gradient italic">Receipt</em>
+        </h1>
+        <p class="text-ivory-dim text-sm mt-2 leading-relaxed">
+          Please transfer the exact amount for your chosen plan to one of our official accounts below, then attach your receipt screenshot.
+        </p>
+      </div>
+
+      <!-- Instruction Transfer Box -->
+      <div class="bg-obsidian-3/60 border border-white/[0.04] rounded-2xl p-5 mb-8 text-xs space-y-3">
+        <div class="flex justify-between items-center pb-2 border-b border-white/[0.04]">
+          <span class="text-ivory-dim tracking-wider uppercase font-medium">Selected Plan:</span>
+          <span class="text-gold font-semibold tracking-wider uppercase bg-gold/10 px-2 py-0.5 rounded-md">
+            {{ plan_slug }}
+          </span>
+        </div>
+        
+        <!-- NEW: Dynamic Amount Banner -->
+        <div class="flex justify-between items-center pb-2 border-b border-white/[0.04]">
+          <span class="text-ivory-dim tracking-wider uppercase font-medium">Amount to Transfer:</span>
+          <span class="text-gold font-bold text-sm tracking-wider bg-gold/10 px-2.5 py-1 rounded-md border border-gold/20">
+            {{ price }} ETB
+          </span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 pt-1">
+          <div>
+            <p class="text-ivory-dim uppercase tracking-wider mb-0.5">Commercial Bank of Ethiopia (CBE)</p>
+            <p class="text-ivory font-mono text-sm font-medium selection:bg-gold/30">1000628394012</p>
+          </div>
+          <div>
+            <p class="text-ivory-dim uppercase tracking-wider mb-0.5">Telebirr Wallet</p>
+            <p class="text-ivory font-mono text-sm font-medium selection:bg-gold/30">0912345678</p>
+          </div>
+        </div>
+        <p class="text-ivory-dim/60 italic text-[11px] pt-1 border-t border-white/[0.04]">
+          *Ensure the transaction state reads successfully completed before uploading the receipt image.
+        </p>
+      </div>
+
+      <!-- Standard Form Processor Loop -->
+      <form method="POST" enctype="multipart/form-data" class="space-y-6">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+          <div class="p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+            {{ form.non_field_errors }}
+          </div>
+        {% endif %}
+
+        <!-- Custom Upload Drag/Drop Screen Element -->
+        <div class="space-y-2">
+          <label for="{{ form.receipt_file.id_for_label }}" class="text-ivory-dim text-xs tracking-wider uppercase font-medium block mb-1">
+            {{ form.receipt_file.label }}
+          </label>
+          
+          <div class="relative group cursor-pointer">
+            <input type="file" 
+                   name="{{ form.receipt_file.html_name }}" 
+                   id="{{ form.receipt_file.id_for_label }}"
+                   class="absolute inset-0 w-full h-full opacity-0 z-20 cursor-pointer"
+                   accept="image/jpeg,image/png,image/jpg"
+                   onchange="updateFileName(this)"
+                   required>
+                   
+            <div id="dropzone" class="border border-dashed border-white/10 group-hover:border-gold/40 bg-obsidian-2 rounded-xl p-8 text-center transition-all flex flex-col items-center justify-center gap-3">
+              <!-- Upload Cloud Graphic Vector -->
+              <div class="w-10 h-10 rounded-full bg-white/[0.02] group-hover:bg-gold/5 flex items-center justify-center border border-white/5 group-hover:border-gold/20 transition-all">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C9A84C" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+                </svg>
+              </div>
+              <div>
+                <p id="upload-prompt" class="text-ivory font-medium text-sm">Click or drag screenshot here</p>
+                <p class="text-ivory-dim/50 text-xs mt-1">JPEG, JPG or PNG up to 5MB</p>
+              </div>
+            </div>
+          </div>
+          
+          {% if form.receipt_file.errors %}
+            <div class="text-red-400 text-xs mt-1">{{ form.receipt_file.errors }}</div>
+          {% endif %}
+        </div>
+
+        <!-- Action Form Action Buttons -->
+        <div class="pt-2">
+          <button type="submit" class="btn-gold w-full py-3.5 rounded-xl font-medium flex items-center justify-center gap-2 group shadow-lg shadow-gold/5">
+            <span>Submit Transfer Verification</span>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" class="group-hover:translate-x-0.5 transition-transform">
+              <path d="M3 8H13M13 8L9 4M13 8L9 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  function updateFileName(input) {
+    const prompt = document.getElementById('upload-prompt');
+    const dropzone = document.getElementById('dropzone');
+    if (input.files && input.files[0]) {
+      const filename = input.files[0].name;
+      prompt.innerHTML = `<span class="text-gold font-mono font-medium">${filename}</span>`;
+      dropzone.classList.remove('border-dashed', 'border-white/10');
+      dropzone.classList.add('border-solid', 'border-gold/50', 'bg-gold/5');
+    }
+  }
+</script>
+{% endblock %}

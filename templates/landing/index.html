@@ -1,0 +1,355 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Fayda ID Converter — Portrait to Landscape, Instantly{% endblock %}
+
+{% block content %}
+
+<!-- ═══════════════════════════════════════════════════════
+     HERO
+═══════════════════════════════════════════════════════ -->
+<section class="relative min-h-[92vh] flex items-center overflow-hidden">
+
+  <!-- Background radial glow -->
+  <div class="absolute inset-0 pointer-events-none">
+    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[600px] rounded-full"
+         style="background: radial-gradient(ellipse at center, #C9A84C0D 0%, transparent 70%);"></div>
+    <div class="absolute top-0 right-0 w-[500px] h-[500px]"
+         style="background: radial-gradient(circle at top right, #C9A84C07, transparent 60%);"></div>
+  </div>
+
+  <!-- Fine grid lines -->
+  <div class="absolute inset-0 pointer-events-none opacity-[0.025]"
+       style="background-image: linear-gradient(#C9A84C 1px, transparent 1px), linear-gradient(90deg, #C9A84C 1px, transparent 1px);
+              background-size: 80px 80px;"></div>
+
+  <div class="relative max-w-6xl mx-auto px-6 py-28 text-center">
+
+    <!-- Eyebrow -->
+    <div class="reveal reveal-1 inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-gold/25 mb-8"
+         style="background: #C9A84C0A;">
+      <span class="w-1.5 h-1.5 rounded-full bg-gold animate-pulse"></span>
+      <span class="text-gold text-xs tracking-[0.18em] uppercase font-medium">Free · Instant · Secure</span>
+    </div>
+
+    <!-- Headline -->
+    <h1 class="reveal reveal-2 font-display text-5xl sm:text-6xl md:text-7xl lg:text-8xl leading-[0.95] mb-6">
+      <span class="text-ivory">Your Fayda ID,</span><br/>
+      <span class="text-gold-gradient italic">perfectly rotated.</span>
+    </h1>
+
+    <!-- Sub -->
+    <p class="reveal reveal-3 text-ivory-dim text-lg md:text-xl leading-relaxed max-w-xl mx-auto mb-12">
+      Convert your Ethiopian Digital ID from portrait to landscape in seconds.
+      No more paying thousands of Birr to middlemen.
+    </p>
+
+    <!-- CTAs -->
+    <div class="reveal reveal-4 flex flex-col sm:flex-row items-center justify-center gap-4">
+      <a href="{% url 'conversions:upload' %}"
+         class="btn-gold px-8 py-4 rounded-full text-base font-medium flex items-center gap-3 group">
+        <span>Convert Your ID — Free</span>
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" class="relative z-10 group-hover:translate-x-0.5 transition-transform">
+          <path d="M4 9H14M14 9L10 5M14 9L10 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      </a>
+      <a href="#how-it-works"
+         class="btn-ghost px-8 py-4 rounded-full text-base font-medium flex items-center gap-2">
+        See how it works
+      </a>
+    </div>
+
+    <!-- Social proof strip -->
+    <div class="reveal reveal-5 mt-20 flex flex-wrap items-center justify-center gap-8">
+      <div class="text-center">
+        <p class="font-display text-3xl text-gold-gradient">3</p>
+        <p class="text-ivory-dim text-xs tracking-widest uppercase mt-0.5">Free / Day</p>
+      </div>
+      <div class="w-px h-10 bg-white/10 hidden sm:block"></div>
+      <div class="text-center">
+        <p class="font-display text-3xl text-gold-gradient">100%</p>
+        <p class="text-ivory-dim text-xs tracking-widest uppercase mt-0.5">Private</p>
+      </div>
+      <div class="w-px h-10 bg-white/10 hidden sm:block"></div>
+      <div class="text-center">
+        <p class="font-display text-3xl text-gold-gradient">0 Birr</p>
+        <p class="text-ivory-dim text-xs tracking-widest uppercase mt-0.5">To Start</p>
+      </div>
+      <div class="w-px h-10 bg-white/10 hidden sm:block"></div>
+      <div class="text-center">
+        <p class="font-display text-3xl text-gold-gradient">PDF + Image</p>
+        <p class="text-ivory-dim text-xs tracking-widest uppercase mt-0.5">Supported</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scroll cue -->
+  <div class="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 opacity-30">
+    <span class="text-ivory text-xs tracking-widest uppercase">Scroll</span>
+    <div class="w-px h-10 bg-gradient-to-b from-gold to-transparent"></div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     HOW IT WORKS
+═══════════════════════════════════════════════════════ -->
+<section id="how-it-works" class="py-28 relative">
+  <div class="max-w-5xl mx-auto px-6">
+
+    <!-- Section label -->
+    <div class="text-center mb-16">
+      <p class="text-gold text-xs tracking-[0.2em] uppercase mb-3">Process</p>
+      <h2 class="font-display text-4xl md:text-5xl text-ivory">Three steps.<br/><em class="text-gold-gradient">One perfect ID.</em></h2>
+    </div>
+
+    <div class="grid md:grid-cols-3 gap-6">
+
+      <!-- Step 1 -->
+      <div class="glass-card rounded-2xl p-8 relative group" style="animation: glowPulse 4s ease-in-out infinite;">
+        <div class="text-gold/20 font-display text-7xl font-light absolute top-4 right-6 select-none">01</div>
+        <div class="w-12 h-12 rounded-xl border border-gold/30 flex items-center justify-center mb-6"
+             style="background: #C9A84C0D;">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+            <path d="M11 3v10M7 9l4 4 4-4" stroke="#C9A84C" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M4 16h14" stroke="#C9A84C" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+          </svg>
+        </div>
+        <h3 class="font-display text-xl text-ivory mb-2">Upload your ID</h3>
+        <p class="text-ivory-dim text-sm leading-relaxed">
+          Drag and drop your e-Fayda PDF or a photo from the Telebirr app. No account required to start.
+        </p>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="glass-card rounded-2xl p-8 relative group" style="animation: glowPulse 4s ease-in-out infinite 1.3s;">
+        <div class="text-gold/20 font-display text-7xl font-light absolute top-4 right-6 select-none">02</div>
+        <div class="w-12 h-12 rounded-xl border border-gold/30 flex items-center justify-center mb-6"
+             style="background: #C9A84C0D;">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+            <rect x="3" y="6" width="16" height="11" rx="2" stroke="#C9A84C" stroke-width="1.5"/>
+            <path d="M7 6V5a4 4 0 018 0v1" stroke="#C9A84C" stroke-width="1.5" opacity="0.5"/>
+            <path d="M9 12l2 2 4-3" stroke="#C9A84C" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h3 class="font-display text-xl text-ivory mb-2">We convert it</h3>
+        <p class="text-ivory-dim text-sm leading-relaxed">
+          Our engine detects, crops, and rotates your ID card to standard landscape format at 300 DPI — print-ready.
+        </p>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="glass-card rounded-2xl p-8 relative group" style="animation: glowPulse 4s ease-in-out infinite 2.6s;">
+        <div class="text-gold/20 font-display text-7xl font-light absolute top-4 right-6 select-none">03</div>
+        <div class="w-12 h-12 rounded-xl border border-gold/30 flex items-center justify-center mb-6"
+             style="background: #C9A84C0D;">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+            <path d="M11 3v10M7 9l4 4 4-4" stroke="#C9A84C" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" transform="rotate(180 11 8)"/>
+            <path d="M4 16h14" stroke="#C9A84C" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+          </svg>
+        </div>
+        <h3 class="font-display text-xl text-ivory mb-2">Download & print</h3>
+        <p class="text-ivory-dim text-sm leading-relaxed">
+          Get a clean landscape JPEG instantly. Ready for any office, school, or print shop in Ethiopia.
+        </p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     PROBLEM / WHY
+═══════════════════════════════════════════════════════ -->
+<section class="py-20 border-y border-white/[0.05]">
+  <div class="max-w-4xl mx-auto px-6 text-center">
+    <p class="text-gold text-xs tracking-[0.2em] uppercase mb-4">The Problem We Solved</p>
+   <blockquote class="font-display text-2xl md:text-3xl text-ivory leading-relaxed mb-6">
+  "People across the country are facing <span class="text-gold-gradient font-medium">endless delays</span> 
+  and paying exorbitant fees just to format their digital IDs. We deliver a secure, professional 
+  landscape layout instantly for a fraction of the cost."
+</blockquote>
+    <p class="text-ivory-dim leading-relaxed max-w-xl mx-auto">
+      We built this properly. Free tier for everyone. Affordable plans for offices and print shops.
+      Your file is deleted the moment you download it — we never store your ID.
+    </p>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     PRICING
+═══════════════════════════════════════════════════════ -->
+<section id="pricing" class="py-28">
+  <div class="max-w-6xl mx-auto px-6">
+
+    <div class="text-center mb-16">
+      <p class="text-gold text-xs tracking-[0.2em] uppercase mb-3">Pricing</p>
+      <h2 class="font-display text-4xl md:text-5xl text-ivory">Fair pricing.<br/><em class="text-gold-gradient">No surprises.</em></h2>
+    </div>
+
+    <!-- Pricing grid -->
+   <div class="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-5">
+
+  <!-- Tier 1: Starter Plan -->
+  <div class="glass-card rounded-2xl p-6 flex flex-col transition-all duration-300 hover:-translate-y-1">
+    <p class="text-ivory-dim text-xs tracking-widest uppercase mb-1">Starter Plan</p>
+    <div class="flex items-end gap-2 mb-1">
+      <span class="font-display text-4xl text-ivory">25</span>
+      <span class="text-ivory-dim text-sm mb-1">ETB</span>
+    </div>
+    <p class="text-ivory-dim text-xs mb-6">1 ID Conversion</p>
+    <ul class="space-y-2 flex-1 mb-6">
+      <li class="text-ivory-dim text-sm flex gap-2"><span class="text-gold">✓</span> 1 ID conversion</li>
+      <li class="text-ivory-dim text-sm flex gap-2"><span class="text-gold">✓</span> Basic support</li>
+      <li class="text-ivory-dim text-sm flex gap-2"><span class="text-gold">✓</span> Standard processing</li>
+    </ul>
+    <a href="{% url 'billing:submit_proof' 'starter' %}" class="btn-ghost px-4 py-2.5 rounded-xl text-sm text-center block font-medium tracking-wide">
+      Purchase Plan
+    </a>
+  </div>
+
+  <!-- Tier 2: Plus Plan -->
+  <div class="glass-card rounded-2xl p-6 flex flex-col transition-all duration-300 hover:-translate-y-1">
+    <p class="text-ivory-dim text-xs tracking-widest uppercase mb-1">Plus Plan</p>
+    <div class="flex items-end gap-2 mb-1">
+      <span class="font-display text-4xl text-ivory">50</span>
+      <span class="text-ivory-dim text-sm mb-1">ETB</span>
+    </div>
+    <p class="text-ivory-dim text-xs mb-6">2 ID Conversions</p>
+    <ul class="space-y-2 flex-1 mb-6">
+      <li class="text-ivory-dim text-sm flex gap-2"><span class="text-gold">✓</span> 2 ID conversions</li>
+      <li class="text-ivory-dim text-sm flex gap-2"><span class="text-gold">✓</span> Basic support</li>
+      <li class="text-ivory-dim text-sm flex gap-2"><span class="text-gold">✓</span> Saved balance ledger</li>
+    </ul>
+    <a href="{% url 'billing:submit_proof' 'plus' %}" class="btn-ghost px-4 py-2.5 rounded-xl text-sm text-center block font-medium tracking-wide">
+      Purchase Plan
+    </a>
+  </div>
+
+  <!-- Tier 3: Basic Plan -->
+  <div class="glass-card rounded-2xl p-6 flex flex-col transition-all duration-300 hover:-translate-y-1">
+    <div class="flex justify-between items-start mb-1">
+      <p class="text-ivory-dim text-xs tracking-widest uppercase">Basic Plan</p>
+      <span class="bg-gold/10 text-gold text-[10px] font-bold px-2 py-0.5 rounded-full tracking-wider">Save 25 ETB</span>
+    </div>
+    <div class="flex items-end gap-2 mb-1">
+      <span class="font-display text-4xl text-ivory">275</span>
+      <span class="text-ivory-dim text-sm mb-1">ETB</span>
+      <span class="text-ivory-dim/40 text-sm line-through mb-1">300 ETB</span>
+    </div>
+    <p class="text-ivory-dim text-xs mb-6">12 ID Conversions</p>
+    <ul class="space-y-2 flex-1 mb-6">
+      <li class="text-ivory-dim text-sm flex gap-2"><span class="text-gold">✓</span> 12 ID conversions</li>
+      <li class="text-ivory-dim text-sm flex gap-2"><span class="text-gold">✓</span> Email support</li>
+      <li class="text-ivory-dim text-sm flex gap-2"><span class="text-gold">✓</span> Priority processing</li>
+    </ul>
+    <a href="{% url 'billing:submit_proof' 'basic' %}" class="btn-ghost px-4 py-2.5 rounded-xl text-sm text-center block font-medium tracking-wide">
+      Purchase Plan
+    </a>
+  </div>
+
+  <!-- Tier 4: Standard Plan -->
+  <div class="glass-card rounded-2xl p-6 flex flex-col transition-all duration-300 hover:-translate-y-1">
+    <div class="flex justify-between items-start mb-1">
+      <p class="text-ivory-dim text-xs tracking-widest uppercase">Standard Plan</p>
+      <span class="bg-gold/10 text-gold text-[10px] font-bold px-2 py-0.5 rounded-full tracking-wider">Save 200 ETB</span>
+    </div>
+    <div class="flex items-end gap-2 mb-1">
+      <span class="font-display text-4xl text-ivory">800</span>
+      <span class="text-ivory-dim text-sm mb-1">ETB</span>
+      <span class="text-ivory-dim/40 text-sm line-through mb-1">1,000 ETB</span>
+    </div>
+    <p class="text-ivory-dim text-xs mb-6">40 ID Conversions</p>
+    <ul class="space-y-2 flex-1 mb-6">
+      <li class="text-ivory-dim text-sm flex gap-2"><span class="text-gold">✓</span> 40 ID conversions</li>
+      <li class="text-ivory-dim text-sm flex gap-2"><span class="text-gold">✓</span> Email support</li>
+      <li class="text-ivory-dim text-sm flex gap-2"><span class="text-gold">✓</span> Priority processing</li>
+    </ul>
+    <a href="{% url 'billing:submit_proof' 'standard' %}" class="btn-ghost px-4 py-2.5 rounded-xl text-sm text-center block font-medium tracking-wide">
+      Purchase Plan
+    </a>
+  </div>
+
+  <!-- Tier 5: Printing Pro Package (Featured Highlight) -->
+  <div class="rounded-2xl p-6 flex flex-col relative overflow-hidden transition-all duration-300 hover:-translate-y-1 group shadow-xl"
+       style="background: linear-gradient(135deg, #1C1810 0%, #111108 100%); border: 1px solid #C9A84C55; animation: glowPulse 3s ease-in-out infinite;">
+    <div class="absolute top-3 right-3 bg-gold text-obsidian text-[10px] font-semibold tracking-widest uppercase px-2 py-0.5 rounded-full z-10">Best Value</div>
+    <div class="flex justify-between items-start mb-1 pr-16">
+      <p class="text-gold text-xs tracking-widest uppercase font-medium">Printing Pro Package</p>
+    </div>
+    <div class="flex items-end gap-2 mb-1">
+      <span class="font-display text-4xl text-gold-gradient font-medium">3,450</span>
+      <span class="text-ivory-dim text-sm mb-1">ETB</span>
+      <span class="text-ivory-dim/30 text-sm line-through mb-1">3,750 ETB</span>
+    </div>
+    <p class="text-ivory-dim text-xs mb-2">150 ID Conversions</p>
+    <p class="text-gold text-[11px] font-medium mb-4">🔥 Bulk Bonus: Save 300 ETB flat</p>
+    <ul class="space-y-2 flex-1 mb-6">
+      <li class="text-ivory text-sm flex gap-2"><span class="text-gold">✓</span> 150 ID bulk package</li>
+      <li class="text-ivory text-sm flex gap-2"><span class="text-gold">✓</span> Bulk engine dashboard</li>
+      <li class="text-ivory text-sm flex gap-2"><span class="text-gold">✓</span> Instant batch processing</li>
+    </ul>
+    <a href="{% url 'billing:submit_proof' 'printing-pro' %}" class="btn-gold px-4 py-2.5 rounded-xl text-sm text-center block font-semibold">
+      <span>Purchase Plan</span>
+    </a>
+  </div>
+
+  <!-- Tier 6: Enterprise Plan -->
+  <div class="glass-card rounded-2xl p-6 flex flex-col transition-all duration-300 hover:-translate-y-1">
+    <div class="flex justify-between items-start mb-1">
+      <p class="text-ivory-dim text-xs tracking-widest uppercase">Enterprise Plan</p>
+      <span class="bg-gold/10 text-gold text-[10px] font-bold px-2 py-0.5 rounded-full tracking-wider">Save 300 ETB</span>
+    </div>
+    <div class="flex items-end gap-2 mb-1">
+      <span class="font-display text-4xl text-ivory">17,200</span>
+      <span class="text-ivory-dim text-sm mb-1">ETB</span>
+      <span class="text-ivory-dim/40 text-sm line-through mb-1">17,500 ETB</span>
+    </div>
+    <p class="text-ivory-dim text-xs mb-6">700 ID Conversions</p>
+    <ul class="space-y-2 flex-1 mb-6">
+      <li class="text-ivory-dim text-sm flex gap-2"><span class="text-gold">✓</span> 700 ID conversions</li>
+      <li class="text-ivory-dim text-sm flex gap-2"><span class="text-gold">✓</span> Custom dashboard access</li>
+      <li class="text-ivory-dim text-sm flex gap-2"><span class="text-gold">✓</span> Top priority line</li>
+    </ul>
+    <a href="{% url 'billing:submit_proof' 'enterprise' %}" class="btn-ghost px-4 py-2.5 rounded-xl text-sm text-center block font-medium tracking-wide">
+      Purchase Plan
+    </a>
+  </div>
+
+</div>
+
+    <!-- One-time note -->
+    <p class="text-center text-ivory-dim text-sm mt-8">
+      Need just a few?
+      <a href="{% url 'accounts:register' %}" class="text-gold hover:underline">One-time credit packs</a>
+      start at 250 Birr for 12 conversions.
+    </p>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     FINAL CTA
+═══════════════════════════════════════════════════════ -->
+<section class="py-24">
+  <div class="max-w-2xl mx-auto px-6 text-center">
+    <div class="glass-card rounded-3xl p-12" style="animation: glowPulse 4s ease-in-out infinite;">
+      <p class="text-gold text-xs tracking-[0.2em] uppercase mb-4">Ready?</p>
+      <h2 class="font-display text-4xl md:text-5xl text-ivory mb-4">
+        Convert your ID<br/><em class="text-gold-gradient">right now.</em>
+      </h2>
+      <p class="text-ivory-dim mb-8">No account needed to start. Upload, convert, download.</p>
+      <a href="{% url 'conversions:upload' %}"
+         class="btn-gold px-10 py-4 rounded-full text-base inline-flex items-center gap-3">
+        <span>Start Converting — Free</span>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" class="relative z-10">
+          <path d="M3 8H13M13 8L9 4M13 8L9 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+      </a>
+    </div>
+  </div>
+</section>
+
+{% endblock %}

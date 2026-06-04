@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Receipt Uploaded — Fayda ID Converter{% endblock %}
+
+{% block content %}
+<section class="relative min-h-[85vh] flex items-center justify-center py-20 overflow-hidden">
+  
+  <!-- Atmospheric Glow Base Layout Elements -->
+  <div class="absolute inset-0 pointer-events-none z-0">
+    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[500px] rounded-full"
+         style="background: radial-gradient(ellipse at center, #C9A84C0A 0%, transparent 75%);"></div>
+  </div>
+
+  <div class="relative w-full max-w-lg mx-auto px-6 z-10 text-center">
+    
+    <!-- Success Icon Container -->
+    <div class="reveal reveal-1 inline-flex items-center justify-center w-20 h-20 rounded-2xl border border-gold/30 mb-8 relative"
+         style="background: linear-gradient(135deg, #1C1810 0%, #111108 100%); border: 1px solid #C9A84C44; animation: glowPulse 3s ease-in-out infinite;">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#C9A84C" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+        <polyline points="22 4 12 14.01 9 11.01"/>
+      </svg>
+    </div>
+
+    <!-- Main Message Frame -->
+    <div class="space-y-4 mb-10">
+      <h1 class="reveal reveal-2 font-display text-4xl text-ivory">
+        Receipt <em class="text-gold-gradient italic">Received</em>
+      </h1>
+      <p class="reveal reveal-3 text-ivory-dim text-sm leading-relaxed max-w-md mx-auto">
+        Your payment reference has been successfully submitted to our verification pipeline. 
+        Our administrative team is auditing the transfer against our banking ledger records.
+      </p>
+    </div>
+
+    <!-- Pipeline Timeline Details Container -->
+    <div class="reveal reveal-4 glass-card rounded-2xl p-6 text-left border border-white/[0.03] bg-gradient-to-b from-obsidian-2 to-obsidian-3/40 mb-8 space-y-4">
+      <div class="flex gap-4 items-start">
+        <div class="w-2 h-2 rounded-full bg-gold mt-1.5 shadow-sm shadow-gold"></div>
+        <div>
+          <h4 class="text-xs font-semibold text-ivory uppercase tracking-wider">Step 1: Reference Audit</h4>
+          <p class="text-xs text-ivory-dim mt-0.5">We check the mobile network reference against active incoming transactions.</p>
+        </div>
+      </div>
+      <div class="flex gap-4 items-start">
+        <div class="w-2 h-2 rounded-full bg-white/20 mt-1.5"></div>
+        <div>
+          <h4 class="text-xs font-semibold text-ivory-dim uppercase tracking-wider">Step 2: Balance Activation</h4>
+          <p class="text-xs text-ivory-dim/50 mt-0.5">Once confirmed, credits are immediately added directly to your account balance ledger profile.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Primary Router Redirection Actions -->
+    <div class="reveal reveal-5 flex flex-col sm:flex-row items-center justify-center gap-4">
+      <a href="{% url 'conversions:upload' %}" class="btn-gold w-full sm:w-auto px-8 py-3.5 rounded-xl text-sm font-medium">
+        <span>Go to Dashboard</span>
+      </a>
+      <a href="{% url 'landing:index' %}" class="btn-ghost w-full sm:w-auto px-8 py-3.5 rounded-xl text-sm font-medium">
+        Return Home
+      </a>
+    </div>
+
+  </div>
+</section>
+{% endblock %}

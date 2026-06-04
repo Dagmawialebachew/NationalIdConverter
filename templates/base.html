@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}{{ page_title|default:"Fayda Converter" }} — Fayda ID Converter{% endblock %}</title>
+  <meta name="description" content="{% block meta_description %}Convert your Ethiopian Fayda ID from portrait to landscape — free, instant, and secure.{% endblock %}" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+   {% load static %}
+  <!-- <link href="{% static 'css/main.css' %}" rel="stylesheet" /> -->
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            gold:    { DEFAULT: '#C9A84C', light: '#E0C278', dark: '#9C7C2E', faint: '#C9A84C1A' },
+            obsidian:{ DEFAULT: '#0A0A0B', 2: '#111114', 3: '#18181C', 4: '#222228', 5: '#2C2C35' },
+            ivory:   { DEFAULT: '#F5F0E8', muted: '#C8C0B0', dim: '#7A7570' },
+          },
+          fontFamily: {
+            display: ['"Cormorant Garamond"', 'Georgia', 'serif'],
+            body:    ['"DM Sans"', 'sans-serif'],
+          },
+          backgroundImage: {
+            'grain': "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E\")",
+          },
+          animation: {
+            'fade-up':    'fadeUp 0.6s ease forwards',
+            'fade-in':    'fadeIn 0.4s ease forwards',
+            'glow-pulse': 'glowPulse 3s ease-in-out infinite',
+          },
+          keyframes: {
+            fadeUp:    { '0%': { opacity: 0, transform: 'translateY(18px)' }, '100%': { opacity: 1, transform: 'translateY(0)' } },
+            fadeIn:    { '0%': { opacity: 0 }, '100%': { opacity: 1 } },
+            glowPulse: { '0%,100%': { boxShadow: '0 0 20px #C9A84C22' }, '50%': { boxShadow: '0 0 48px #C9A84C44' } },
+          },
+        }
+      }
+    }
+  </script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      background-color: #0A0A0B;
+      color: #F5F0E8;
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 300;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Grain overlay on every page */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* Gold shimmer line at top */
+    body::after {
+      content: '';
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, #C9A84C88, transparent);
+      z-index: 100;
+    }
+
+    .font-display { font-family: 'Cormorant Garamond', Georgia, serif; }
+
+    /* Gold text gradient */
+    .text-gold-gradient {
+      background: linear-gradient(135deg, #E0C278 0%, #C9A84C 50%, #9C7C2E 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* Glass card */
+    .glass-card {
+      background: linear-gradient(135deg, #18181C 0%, #111114 100%);
+      border: 1px solid #C9A84C22;
+      backdrop-filter: blur(12px);
+    }
+    .glass-card:hover {
+      border-color: #C9A84C55;
+      transition: border-color 0.3s ease;
+    }
+
+    /* Gold button */
+    .btn-gold {
+      background: linear-gradient(135deg, #C9A84C, #9C7C2E);
+      color: #0A0A0B;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      transition: all 0.25s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .btn-gold::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, #E0C278, #C9A84C);
+      opacity: 0;
+      transition: opacity 0.25s ease;
+    }
+    .btn-gold:hover::after { opacity: 1; }
+    .btn-gold span { position: relative; z-index: 1; }
+
+    /* Ghost button */
+    .btn-ghost {
+      border: 1px solid #C9A84C44;
+      color: #C9A84C;
+      transition: all 0.25s ease;
+    }
+    .btn-ghost:hover {
+      border-color: #C9A84C;
+      background: #C9A84C0D;
+    }
+
+    /* Form inputs */
+    .form-input {
+      background: #18181C;
+      border: 1px solid #2C2C35;
+      color: #F5F0E8;
+      border-radius: 0.5rem;
+      padding: 0.75rem 1rem;
+      width: 100%;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.9375rem;
+    }
+    .form-input:focus {
+      outline: none;
+      border-color: #C9A84C;
+      box-shadow: 0 0 0 3px #C9A84C18;
+    }
+    .form-input::placeholder { color: #7A7570; }
+
+    .form-select {
+      background: #18181C url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23C9A84C' d='M6 8L1 3h10z'/%3E%3C/svg%3E") no-repeat right 1rem center;
+      border: 1px solid #2C2C35;
+      color: #F5F0E8;
+      border-radius: 0.5rem;
+      padding: 0.75rem 2.5rem 0.75rem 1rem;
+      width: 100%;
+      appearance: none;
+      -webkit-appearance: none;
+      transition: border-color 0.2s ease;
+      font-family: 'DM Sans', sans-serif;
+    }
+    .form-select:focus {
+      outline: none;
+      border-color: #C9A84C;
+      box-shadow: 0 0 0 3px #C9A84C18;
+    }
+
+    /* Divider with gold centre dot */
+    .gold-divider {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .gold-divider::before, .gold-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, #C9A84C44);
+    }
+    .gold-divider::after { background: linear-gradient(90deg, #C9A84C44, transparent); }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #0A0A0B; }
+    ::-webkit-scrollbar-thumb { background: #C9A84C44; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #C9A84C88; }
+
+    /* Label style */
+    label { color: #C8C0B0; font-size: 0.8125rem; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 0.4rem; display: block; }
+
+    /* Error text */
+    .errorlist { list-style: none; padding: 0; margin: 0.35rem 0 0; }
+    .errorlist li { color: #FF6B6B; font-size: 0.8125rem; }
+
+    /* Help text */
+    .helptext { color: #7A7570; font-size: 0.8125rem; margin-top: 0.3rem; display: block; }
+
+    /* Animated entrance utility */
+    .reveal { opacity: 0; animation: fadeUp 0.7s ease forwards; }
+    .reveal-1 { animation-delay: 0.1s; }
+    .reveal-2 { animation-delay: 0.2s; }
+    .reveal-3 { animation-delay: 0.3s; }
+    .reveal-4 { animation-delay: 0.4s; }
+    .reveal-5 { animation-delay: 0.5s; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    @keyframes glowPulse {
+      0%, 100% { box-shadow: 0 0 20px #C9A84C1A; }
+      50%       { box-shadow: 0 0 50px #C9A84C33; }
+    }
+  </style>
+
+  {% block extra_head %}{% endblock %}
+</head>
+
+<body class="min-h-screen flex flex-col">
+
+  {% include "partials/_navbar.html" %}
+
+  <!-- Flash messages -->
+  {% include "partials/_messages.html" %}
+
+  <!-- Page content -->
+  <main class="flex-1">
+    {% block content %}{% endblock %}
+  </main>
+
+  {% include "partials/_footer.html" %}
+
+  {% block extra_js %}{% endblock %}
+
+</body>
+</html>

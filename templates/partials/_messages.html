@@ -1,0 +1,70 @@
+{% if messages %}
+<div id="messages-container"
+     class="fixed top-20 right-4 z-[200] flex flex-col gap-3 max-w-sm w-full"
+     style="pointer-events: none;">
+  {% for message in messages %}
+  <div class="message-toast pointer-events-auto flex items-start gap-3 px-4 py-3 rounded-xl border backdrop-blur-xl
+              {% if message.tags == 'success' %}bg-emerald-950/80 border-emerald-500/30 text-emerald-200
+              {% elif message.tags == 'error' %}bg-red-950/80 border-red-500/30 text-red-200
+              {% elif message.tags == 'warning' %}bg-amber-950/80 border-gold/30 text-amber-200
+              {% else %}bg-obsidian-3/80 border-gold/20 text-ivory-muted{% endif %}"
+       style="animation: slideInRight 0.35s ease forwards; box-shadow: 0 8px 32px rgba(0,0,0,0.5);">
+
+    <!-- Icon -->
+    <div class="flex-shrink-0 mt-0.5">
+      {% if message.tags == 'success' %}
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <circle cx="8" cy="8" r="7" stroke="#10B981" stroke-width="1.2"/>
+          <path d="M5 8l2 2 4-4" stroke="#10B981" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      {% elif message.tags == 'error' %}
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <circle cx="8" cy="8" r="7" stroke="#EF4444" stroke-width="1.2"/>
+          <path d="M6 6l4 4M10 6l-4 4" stroke="#EF4444" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+      {% elif message.tags == 'warning' %}
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M8 2L14.9 14H1.1L8 2Z" stroke="#C9A84C" stroke-width="1.2" stroke-linejoin="round"/>
+          <path d="M8 7v3M8 11.5v.5" stroke="#C9A84C" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+      {% else %}
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <circle cx="8" cy="8" r="7" stroke="#C9A84C" stroke-width="1.2"/>
+          <path d="M8 7v4M8 5.5v.5" stroke="#C9A84C" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+      {% endif %}
+    </div>
+
+    <!-- Text -->
+    <p class="text-sm leading-snug flex-1">{{ message }}</p>
+
+    <!-- Dismiss -->
+    <button onclick="this.closest('.message-toast').remove()"
+            class="flex-shrink-0 opacity-50 hover:opacity-100 transition-opacity mt-0.5">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <path d="M3 3l8 8M11 3L3 11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+    </button>
+  </div>
+  {% endfor %}
+</div>
+
+<style>
+  @keyframes slideInRight {
+    from { opacity: 0; transform: translateX(24px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+</style>
+
+<script>
+  // Auto-dismiss messages after 5 seconds
+  document.querySelectorAll('.message-toast').forEach(function(toast, i) {
+    setTimeout(function() {
+      toast.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateX(12px)';
+      setTimeout(function() { toast.remove(); }, 400);
+    }, 5000 + i * 300);
+  });
+</script>
+{% endif %}

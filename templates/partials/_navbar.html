@@ -1,0 +1,168 @@
+<nav class="fixed top-0 left-0 right-0 z-50 transition-all duration-300" id="main-nav">
+  <div class="absolute inset-0 bg-obsidian/80 backdrop-blur-xl border-b border-white/[0.04] transition-colors duration-300" id="nav-backdrop"></div>
+
+  <div class="relative max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+
+    <a href="{% url 'landing:index' %}" class="flex items-center gap-3 group">
+      <div class="w-8 h-8 rounded-full border border-gold/40 flex items-center justify-center group-hover:border-gold/80 transition-colors duration-300"
+           style="background: radial-gradient(circle at 40% 35%, #C9A84C22, transparent);">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M8 1L9.8 6H15L10.6 9.2L12.4 14.2L8 11L3.6 14.2L5.4 9.2L1 6H6.2L8 1Z"
+                fill="#C9A84C" opacity="0.9"/>
+        </svg>
+      </div>
+      <div>
+        <span class="font-display text-lg font-semibold text-gold-gradient tracking-wide leading-none">Fayda</span>
+        <span class="text-ivory-muted text-xs tracking-[0.18em] uppercase block leading-none mt-0.5">Converter</span>
+      </div>
+    </a>
+
+    <div class="hidden md:flex items-center gap-8">
+      <a href="{% url 'landing:index' %}#how-it-works"
+         class="text-ivory-dim text-sm tracking-wide hover:text-ivory transition-colors duration-200">
+        How It Works
+      </a>
+      <a href="{% url 'landing:index' %}#pricing"
+         class="text-ivory-dim text-sm tracking-wide hover:text-ivory transition-colors duration-200">
+        Pricing
+      </a>
+      
+      {% if user.is_authenticated %}
+        <div class="flex items-center gap-2 px-3 py-1 rounded-full border border-gold/20 bg-gold/5 backdrop-blur-md select-none text-xs font-medium text-gold tracking-wide transition-all duration-300 hover:border-gold/40">
+          <span class="relative flex h-1.5 w-1.5">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-gold opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-gold"></span>
+          </span>
+          <span class="font-semibold tracking-normal font-body">
+            <span class="navbar-credit-counter">{% if user.conversion_quota.is_unlimited %}∞{% else %}{{ user.conversion_quota.remaining }}{% endif %}</span>
+          </span>
+          <span class="text-gold/60 text-[10px] uppercase tracking-wider font-semibold">Credits</span>
+        </div>
+
+        <a href="{% url 'accounts:profile' %}"
+           class="text-ivory-dim text-sm tracking-wide hover:text-ivory transition-colors duration-200">
+          Profile
+        </a>
+        <form method="post" action="{% url 'accounts:logout' %}" class="inline">
+          {% csrf_token %}
+          <button type="submit"
+                  class="text-ivory-dim text-sm tracking-wide hover:text-gold transition-colors duration-200">
+            Sign Out
+          </button>
+        </form>
+      {% else %}
+        <a href="{% url 'accounts:login' %}"
+           class="text-ivory-dim text-sm tracking-wide hover:text-ivory transition-colors duration-200">
+          Sign In
+        </a>
+      {% endif %}
+    </div>
+
+    <div class="flex items-center gap-3">
+      <a href="{% url 'conversions:upload' %}"
+         class="btn-gold px-5 py-2 rounded-full text-sm hidden sm:inline-flex items-center gap-2">
+        <span>Convert Now</span>
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="relative z-10">
+          <path d="M3 7H11M11 7L8 4M11 7L8 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </a>
+
+      <button id="mobile-menu-btn" class="md:hidden text-ivory-muted hover:text-gold transition-colors p-1">
+        <svg id="menu-open-icon" width="22" height="22" viewBox="0 0 22 22" fill="none">
+          <path d="M3 6H19M3 11H19M3 16H19" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <svg id="menu-close-icon" class="hidden" width="22" height="22" viewBox="0 0 22 22" fill="none">
+          <path d="M5 5L17 17M17 5L5 17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <div id="mobile-menu"
+       class="hidden md:hidden relative bg-obsidian-2 border-b border-white/[0.06] px-6 py-4 flex flex-col gap-4">
+    <a href="{% url 'landing:index' %}#how-it-works" class="text-ivory-dim text-sm">How It Works</a>
+    <a href="{% url 'landing:index' %}#pricing" class="text-ivory-dim text-sm">Pricing</a>
+    
+    {% if user.is_authenticated %}
+      <div class="flex items-center gap-2 px-3 py-1.5 rounded-full border border-gold/20 bg-gold/5 select-none text-xs font-medium text-gold tracking-wide self-start">
+        <span class="w-1.5 h-1.5 rounded-full bg-gold animate-pulse"></span>
+        <span>Balance: <span class="navbar-credit-counter font-semibold">{% if user.conversion_quota.is_unlimited %}∞{% else %}{{ user.conversion_quota.remaining }}{% endif %}</span> Credits</span>
+      </div>
+
+      <a href="{% url 'accounts:profile' %}" class="text-ivory-dim text-sm">Profile</a>
+      <form method="post" action="{% url 'accounts:logout' %}">
+        {% csrf_token %}
+        <button type="submit" class="text-ivory-dim text-sm text-left">Sign Out</button>
+      </form>
+    {% else %}
+      <a href="{% url 'accounts:login' %}" class="text-ivory-dim text-sm">Sign In</a>
+      <a href="{% url 'accounts:register' %}" class="text-ivory-dim text-sm">Create Account</a>
+    {% endif %}
+    <a href="{% url 'conversions:upload' %}" class="btn-gold px-5 py-2.5 rounded-full text-sm text-center">
+      <span>Convert Now</span>
+    </a>
+  </div>
+</nav>
+
+<div class="h-16"></div>
+
+<script>
+  (function() {
+    const btn = document.getElementById('mobile-menu-btn');
+    const menu = document.getElementById('mobile-menu');
+    const openIcon = document.getElementById('menu-open-icon');
+    const closeIcon = document.getElementById('menu-close-icon');
+
+    btn.addEventListener('click', function() {
+      menu.classList.toggle('hidden');
+      openIcon.classList.toggle('hidden');
+      closeIcon.classList.toggle('hidden');
+    });
+
+    // Scroll effect: add border at scroll > 10px
+    const nav = document.getElementById('main-nav');
+    window.addEventListener('scroll', function() {
+      nav.style.borderBottomColor = window.scrollY > 10 ? 'rgba(201,168,76,0.12)' : 'rgba(255,255,255,0.04)';
+    });
+
+    {% if user.is_authenticated %}
+    /**
+     * Real-time Navbar Credit Synchronization Engine
+     * Updates counters instantly across both desktop and mobile DOM trees.
+     */
+    window.updateNavbarCredits = function(newValue) {
+      const counters = document.querySelectorAll('.navbar-credit-counter');
+      counters.forEach(el => {
+        if (el.textContent !== String(newValue)) {
+          // Micro-interaction flash effect on count state mutations
+          el.parentElement.classList.add('scale-105', 'text-white');
+          el.textContent = newValue;
+          setTimeout(() => {
+            el.parentElement.classList.remove('scale-105', 'text-white');
+          }, 300);
+        }
+      });
+    };
+
+    /**
+     * Event Broker Interface
+     * Listen for custom DOM event triggers broadcast by upload/conversion scripts
+     */
+    document.addEventListener('creditsUpdated', function(e) {
+      if (e.detail && typeof e.detail.remaining !== 'undefined') {
+        window.updateNavbarCredits(e.detail.is_unlimited ? '∞' : e.detail.remaining);
+      } else {
+        // Fallback: Fetch latest data directly from the API endpoint if values aren't in payload
+        fetch("{% url 'conversions:api_credits' %}")
+          .then(res => res.json())
+          .then(data => {
+            if (data.success) {
+              window.updateNavbarCredits(data.is_unlimited ? '∞' : data.credits);
+            }
+          })
+          .catch(err => console.error('Error auto-syncing credits:', err));
+      }
+    });
+    {% endif %}
+  })();
+</script>

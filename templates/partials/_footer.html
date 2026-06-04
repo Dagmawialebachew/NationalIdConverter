@@ -1,0 +1,63 @@
+<footer class="border-t border-white/[0.06] mt-24">
+  <div class="max-w-6xl mx-auto px-6 py-16">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-12 md:gap-8">
+
+      <!-- Brand column -->
+      <div>
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-8 h-8 rounded-full border border-gold/40 flex items-center justify-center"
+               style="background: radial-gradient(circle at 40% 35%, #C9A84C22, transparent);">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M8 1L9.8 6H15L10.6 9.2L12.4 14.2L8 11L3.6 14.2L5.4 9.2L1 6H6.2L8 1Z"
+                    fill="#C9A84C" opacity="0.9"/>
+            </svg>
+          </div>
+          <span class="font-display text-base font-semibold text-gold-gradient">Fayda Converter</span>
+        </div>
+        <p class="text-ivory-dim text-sm leading-relaxed max-w-xs">
+          Turning Ethiopia's digital ID into a format that works everywhere. Free for everyone, instant, private.
+        </p>
+      </div>
+
+      <!-- Links -->
+      <div>
+        <p class="text-gold text-xs tracking-[0.15em] uppercase mb-4">Product</p>
+        <ul class="space-y-3">
+          <li><a href="{% url 'conversions:upload' %}" class="text-ivory-dim text-sm hover:text-ivory transition-colors">Convert ID</a></li>
+          <li><a href="{% url 'landing:index' %}#pricing" class="text-ivory-dim text-sm hover:text-ivory transition-colors">Pricing</a></li>
+          <li><a href="{% url 'landing:index' %}#how-it-works" class="text-ivory-dim text-sm hover:text-ivory transition-colors">How It Works</a></li>
+        </ul>
+      </div>
+
+      <!-- Account -->
+      <div>
+        <p class="text-gold text-xs tracking-[0.15em] uppercase mb-4">Account</p>
+        <ul class="space-y-3">
+          {% if user.is_authenticated %}
+            <li><a href="{% url 'accounts:profile' %}" class="text-ivory-dim text-sm hover:text-ivory transition-colors">Your Profile</a></li>
+            <li>
+              <form method="post" action="{% url 'accounts:logout' %}" class="inline">
+                {% csrf_token %}
+                <button type="submit" class="text-ivory-dim text-sm hover:text-gold transition-colors text-left">Sign Out</button>
+              </form>
+            </li>
+          {% else %}
+            <li><a href="{% url 'accounts:login' %}" class="text-ivory-dim text-sm hover:text-ivory transition-colors">Sign In</a></li>
+            <li><a href="{% url 'accounts:register' %}" class="text-ivory-dim text-sm hover:text-ivory transition-colors">Create Account</a></li>
+          {% endif %}
+        </ul>
+      </div>
+    </div>
+
+    <!-- Bottom bar -->
+    <div class="mt-14 pt-8 border-t border-white/[0.05] flex flex-col sm:flex-row items-center justify-between gap-4">
+      <p class="text-ivory-dim text-xs tracking-wide">
+        © {% now "Y" %} Fayda Converter. Built with care for Ethiopia.
+      </p>
+      <div class="gold-divider w-24 hidden sm:flex"></div>
+      <p class="text-ivory-dim text-xs">
+        Free to use · Secure · No data stored after download
+      </p>
+    </div>
+  </div>
+</footer>

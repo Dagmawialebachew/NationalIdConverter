@@ -1,0 +1,836 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Convert Your Fayda ID — Upload{% endblock %}
+{% block meta_description %}Upload your Fayda ID card as a PDF or photo and get a landscape version instantly.{% endblock %}
+
+{% block content %}
+<script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+<div class="min-h-[88vh] flex items-center justify-center px-4 py-16" 
+     id="studio-root"
+     x-data="studioEngine()"
+     x-init="initEngine()">
+
+  <div class="fixed inset-0 pointer-events-none">
+    <div class="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[500px] rounded-full transition-all duration-500"
+         :style="studioActive ? 'background: radial-gradient(ellipse, #C9A84C12 0%, transparent 75%); width: 1200px;' : 'background: radial-gradient(ellipse, #C9A84C08 0%, transparent 70%);'"></div>
+  </div>
+
+  <div class="relative w-full transition-all duration-500 ease-out" :class="studioActive ? 'max-w-6xl' : 'max-w-2xl'">
+
+    <div class="text-center mb-8" x-show="!studioActive" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 -translate-y-2">
+      <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-gold/25 mb-6" style="background: #C9A84C0A;">
+        <span class="w-1.5 h-1.5 rounded-full bg-gold animate-pulse"></span>
+        <span class="text-gold text-xs tracking-[0.18em] uppercase font-medium">Free · Instant · Secure</span>
+      </div>
+      <h1 class="font-display text-5xl md:text-6xl text-ivory mb-3">
+        Upload your <em class="text-gold-gradient">Fayda ID</em>
+      </h1>
+      <p class="text-ivory-dim text-base leading-relaxed" id="upload-instruction-text">
+        {% if user.is_authenticated and user.conversion_quota %}
+          Select your processing input method below. 
+          <span class="text-gold block mt-1">
+            {{ user.conversion_quota.remaining }} conversion{{ user.conversion_quota.remaining|pluralize }} remaining today.
+          </span>
+        {% else %}
+          Choose a PDF file or images — 3 free daily conversions.
+        {% endif %}
+      </p>
+    </div>
+
+    <div class="flex p-1 bg-white/[0.03] border border-white/10 backdrop-blur-md rounded-2xl mb-6 max-w-md mx-auto transition-all duration-300" x-show="!studioActive">
+      <button type="button" id="tab-images" 
+              class="flex-1 py-3 text-xs uppercase tracking-wider font-semibold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 bg-gold text-black shadow-lg shadow-gold/10">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+          <circle cx="8.5" cy="8.5" r="1.5"></circle>
+          <polyline points="21 15 16 10 5 21"></polyline>
+        </svg>
+        ID Photos / Scans
+      </button>
+      <button type="button" id="tab-pdf" 
+              class="flex-1 py-3 text-xs uppercase tracking-wider font-semibold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 text-ivory-dim hover:text-ivory">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+          <line x1="16" y1="17" x2="8" y2="17"></line>
+        </svg>
+        e-Fayda PDF
+      </button>
+    </div>
+
+    <div class="glass-card rounded-3xl p-6 md:p-8 relative overflow-hidden" style="animation: glowPulse 4s ease-in-out infinite;">
+
+      <form method="post" enctype="multipart/form-data" id="upload-form" novalidate>
+        {% csrf_token %}
+        
+        <input type="hidden" name="approach" id="id_approach" value="approach_two">
+        <input type="hidden" name="upload_mode" id="id_upload_mode" value="images">
+        
+        <input type="hidden" name="custom_zones" id="id_custom_zones" :value="JSON.stringify(zones)">
+
+        <div id="panel-pdf" class="hidden transition-all duration-300" x-show="!studioActive">
+          <div id="drop-zone-pdf"
+               class="relative border-2 border-dashed border-white/15 rounded-2xl p-10 text-center cursor-pointer transition-all duration-300 mb-6 group hover:border-gold/40 hover:bg-gold/[0.02]">
+            
+            <div id="overlay-pdf" class="absolute inset-0 rounded-2xl bg-black/80 border-2 border-gold/60 hidden items-center justify-center z-30 pointer-events-none">
+              <div class="text-center">
+                <p class="text-gold font-display text-2xl mb-1">Drop PDF here</p>
+                <p class="text-ivory-dim text-xs">Ready to extract your e-Fayda content</p>
+              </div>
+            </div>
+
+            <div id="default-pdf" class="transition-all duration-300 pointer-events-none">
+              <div class="w-14 h-14 rounded-2xl border border-gold/30 flex items-center justify-center mx-auto mb-4 transition-all duration-300 group-hover:border-gold/60"
+                   style="background: radial-gradient(circle at 40% 35%, #C9A84C12, transparent);">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#C9A84C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+                </svg>
+              </div>
+              <p class="text-ivory text-base font-medium mb-1">Drag & drop your Telebirr PDF here</p>
+              <p class="text-ivory-dim text-xs mb-4">or click to search system filesystem</p>
+              <span class="inline-block px-2.5 py-1 rounded-md text-[10px] font-mono border border-white/10 text-gold bg-gold/[0.04]">SINGLE EXTENSION: PDF</span>
+            </div>
+
+            <div id="selected-pdf" class="hidden relative z-20">
+              <div class="mb-4 flex justify-center">
+                <div class="w-16 h-16 rounded-2xl border border-red-500/30 bg-red-500/10 flex flex-col items-center justify-center">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                  </svg>
+                  <span class="text-[9px] font-mono font-bold text-red-400 mt-0.5">PDF</span>
+                </div>
+              </div>
+              <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 mb-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                <span class="text-emerald-400 text-xs font-medium">Document Loaded</span>
+              </div>
+              <p class="text-ivory text-sm font-medium max-w-md mx-auto truncate filename-label">—</p>
+              <p class="text-ivory-dim text-xs mt-0.5 filesize-label">—</p>
+              <button type="button" id="change-pdf-btn" class="mt-4 px-3 py-1.5 rounded-lg border border-white/10 bg-white/[0.02] text-xs text-ivory hover:text-gold hover:border-gold/30 transition-all">
+                Replace Document
+              </button>
+            </div>
+          </div>
+          <input type="file" id="input-file-pdf" name="pdf_file" accept=".pdf" class="hidden" />
+        </div>
+
+        <div id="panel-images" class="block transition-all duration-300">
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6" x-show="!studioActive">
+            
+            <div id="drop-zone-front" class="relative border-2 border-dashed border-white/15 rounded-2xl p-6 text-center cursor-pointer transition-all duration-300 group hover:border-gold/40 hover:bg-gold/[0.02]">
+              <div id="overlay-front" class="absolute inset-0 rounded-2xl bg-black/80 border-2 border-gold/60 hidden items-center justify-center z-30 pointer-events-none">
+                <span class="text-gold text-sm font-medium">Drop Front Profile</span>
+              </div>
+              
+              <div id="default-front" class="pointer-events-none">
+                <div class="w-10 h-10 rounded-xl border border-white/10 flex items-center justify-center mx-auto mb-3 text-ivory-dim group-hover:text-gold group-hover:border-gold/40 transition-all">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><path d="M12 8v8M8 12h8"/></svg>
+                </div>
+                <p class="text-ivory text-sm font-medium mb-0.5">Front Profile Photo</p>
+                <p class="text-ivory-dim text-xs">Drag image or click to add</p>
+              </div>
+
+              <div id="selected-front" class="hidden relative z-20">
+                <img src="" id="rendered-front-cache-src" alt="Front Preview" class="h-24 mx-auto object-contain rounded-lg border border-white/20 mb-3 bg-black/40 p-1 thumbnail-element" />
+                <p class="text-ivory text-xs font-medium truncate filename-label">—</p>
+                <button type="button" id="change-front-btn" class="mt-2 px-2.5 py-1 rounded-md border border-white/10 bg-white/[0.02] text-[11px] text-ivory hover:text-gold hover:border-gold/30 transition-all">Change</button>
+              </div>
+            </div>
+            <input type="file" id="input-file-front" name="front_image" accept=".jpg,.jpeg,.png,.webp" class="hidden" />
+
+            <div id="drop-zone-back" class="relative border-2 border-dashed border-white/15 rounded-2xl p-6 text-center cursor-pointer transition-all duration-300 group hover:border-gold/40 hover:bg-gold/[0.02]">
+              <div id="overlay-back" class="absolute inset-0 rounded-2xl bg-black/80 border-2 border-gold/60 hidden items-center justify-center z-30 pointer-events-none">
+                <span class="text-gold text-sm font-medium">Drop Back Profile</span>
+              </div>
+
+              <div id="default-back" class="pointer-events-none">
+                <div class="w-10 h-10 rounded-xl border border-white/10 flex items-center justify-center mx-auto mb-3 text-ivory-dim group-hover:text-gold group-hover:border-gold/40 transition-all">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><path d="M12 8v8M8 12h8"/></svg>
+                </div>
+                <p class="text-ivory text-sm font-medium mb-0.5">Back Profile Photo</p>
+                <p class="text-ivory-dim text-xs">Drag image or click to add</p>
+              </div>
+
+              <div id="selected-back" class="hidden relative z-20">
+                <img src="" id="rendered-back-cache-src" alt="Back Preview" class="h-24 mx-auto object-contain rounded-lg border border-white/20 mb-3 bg-black/40 p-1 thumbnail-element" />
+                <p class="text-ivory text-xs font-medium truncate filename-label">—</p>
+                <button type="button" id="change-back-btn" class="mt-2 px-2.5 py-1 rounded-md border border-white/10 bg-white/[0.02] text-[11px] text-ivory hover:text-gold hover:border-gold/30 transition-all">Change</button>
+              </div>
+            </div>
+            <input type="file" id="input-file-back" name="back_image" accept=".jpg,.jpeg,.png,.webp" class="hidden" />
+
+          </div>
+
+          <div class="w-full bg-neutral-950 border border-white/10 rounded-2xl p-5 md:p-6 mb-6 transition-all duration-300" 
+               x-show="studioActive" x-cloak x-transition:enter="transition ease-out duration-500" x-transition:enter-start="opacity-0 scale-[0.98]">
+            
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/10 pb-4 mb-6 gap-3">
+              <div>
+                <h2 class="text-ivory font-display text-lg tracking-wide flex items-center gap-2">
+                  <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Asset Alignment Studio
+                </h2>
+                <p class="text-ivory-dim text-xs mt-0.5">Drag any bounding box to shift its vector footprint, or use the bottom right anchor to scale handles.</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <button type="button" @click="resetToDefaultLayout()" class="px-3 py-1.5 rounded-lg border border-white/10 bg-white/[0.02] text-xs text-ivory-dim hover:text-gold transition-all">
+                  Reset Coordinates
+                </button>
+                <button type="button" @click="exitStudioWorkspace()" class="px-3 py-1.5 rounded-lg border border-red-500/30 bg-red-500/5 text-xs text-red-400 hover:bg-red-500/10 transition-all">
+                  Clear Images
+                </button>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+              
+             <div class="flex flex-col gap-2">
+  <div class="flex items-center justify-between px-1">
+    <span class="text-[11px] font-mono tracking-widest text-gold uppercase font-medium">Front Matrix Window</span>
+    <span class="text-[10px] font-mono text-white/40" x-text="focusedZoneCard === 'front' ? 'Modifying: ' + cleanZoneName(focusedZone) : 'Idle mode preview'"></span>
+  </div>
+  <div class="relative w-full overflow-hidden border border-white/10 rounded-xl bg-black select-none group/view" id="viewport-container-front">
+    <img :src="frontImageSource" class="w-full h-auto block select-none pointer-events-none opacity-85" />
+    
+    <template x-for="(coords, zoneKey) in zones.front" :key="zoneKey">
+      <div class="absolute border transition-shadow cursor-move group/box"
+           :class="focusedZone === zoneKey ? 'border-gold bg-gold/10 shadow-[0_0_15px_rgba(201,168,76,0.35)] z-20' : 'border-emerald-500/40 bg-emerald-500/5 hover:border-emerald-400 hover:bg-emerald-500/10 z-10'"
+           :style="getBoxStyle('front', zoneKey)"
+           @mousedown.stop="selectZone('front', zoneKey, $event)"
+           @touchstart.stop="selectZone('front', zoneKey, $event)">
+        
+        <div class="absolute top-1 right-1 px-1.5 py-0.5 rounded text-[7.5px] font-mono uppercase tracking-wider backdrop-blur-md pointer-events-none select-none transition-all duration-200"
+             :class="focusedZone === zoneKey ? 'bg-gold text-black font-bold opacity-100' : 'bg-black/70 text-emerald-400 border border-white/5 opacity-0 group-hover/box:opacity-100'">
+          <span x-text="cleanZoneName(zoneKey)"></span>
+        </div>
+
+        <template x-if="focusedZone === zoneKey">
+          <div class="absolute w-3 h-3 bg-gold border border-black rounded-sm -bottom-1.5 -right-1.5 cursor-se-resize z-30 shadow-md"
+               @mousedown.stop.prevent="startResizing('front', zoneKey, $event)"
+               @touchstart.stop.prevent="startResizing('front', zoneKey, $event)"></div>
+        </template>
+      </div>
+    </template>
+  </div>
+</div>
+
+             <div class="flex flex-col gap-2">
+  <div class="flex items-center justify-between px-1">
+    <span class="text-[11px] font-mono tracking-widest text-gold uppercase font-medium">Back Matrix Window</span>
+    <span class="text-[10px] font-mono text-white/40" x-text="focusedZoneCard === 'back' ? 'Modifying: ' + cleanZoneName(focusedZone) : 'Idle mode preview'"></span>
+  </div>
+  <div class="relative w-full overflow-hidden border border-white/10 rounded-xl bg-black select-none group/view" id="viewport-container-back">
+    <img :src="backImageSource" class="w-full h-auto block select-none pointer-events-none opacity-85" />
+    
+    <template x-for="(coords, zoneKey) in zones.back" :key="zoneKey">
+      <div class="absolute border transition-shadow cursor-move group/box"
+           :class="focusedZone === zoneKey ? 'border-gold bg-gold/10 shadow-[0_0_15px_rgba(201,168,76,0.35)] z-20' : 'border-emerald-500/40 bg-emerald-500/5 hover:border-emerald-400 hover:bg-emerald-500/10 z-10'"
+           :style="getBoxStyle('back', zoneKey)"
+           @mousedown.stop="selectZone('back', zoneKey, $event)"
+           @touchstart.stop="selectZone('back', zoneKey, $event)">
+        
+        <div class="absolute top-1 right-1 px-1.5 py-0.5 rounded text-[7.5px] font-mono uppercase tracking-wider backdrop-blur-md pointer-events-none select-none transition-all duration-200"
+             :class="focusedZone === zoneKey ? 'bg-gold text-black font-bold opacity-100' : 'bg-black/70 text-emerald-400 border border-white/5 opacity-0 group-hover/box:opacity-100'">
+          <span x-text="cleanZoneName(zoneKey)"></span>
+        </div>
+
+        <template x-if="focusedZone === zoneKey">
+          <div class="absolute w-3 h-3 bg-gold border border-black rounded-sm -bottom-1.5 -right-1.5 cursor-se-resize z-30 shadow-md"
+               @mousedown.stop.prevent="startResizing('back', zoneKey, $event)"
+               @touchstart.stop.prevent="startResizing('back', zoneKey, $event)"></div>
+        </template>
+      </div>
+    </template>
+  </div>
+</div>
+
+            </div>
+          </div>
+
+        </div>
+
+        <div id="error-container" class="hidden mb-5 bg-red-950/40 border border-red-500/30 rounded-xl px-4 py-3">
+          <div id="error-list" class="text-red-300 text-sm flex flex-col gap-2"></div>
+        </div>
+
+        <div id="progress-container" class="hidden mb-6">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-ivory-dim text-xs tracking-wide" id="progress-label">Reading file…</span>
+            <span class="text-gold text-xs font-mono" id="progress-percentage">0%</span>
+          </div>
+          <div class="h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
+            <div id="progress-bar" class="h-full rounded-full transition-all duration-300" style="width: 0%; background: linear-gradient(90deg, #C9A84C, #E0C278);"></div>
+          </div>
+        </div>
+
+        <button type="submit" id="submit-btn"
+                class="btn-gold w-full py-4 rounded-xl text-base font-medium tracking-wide flex items-center justify-center gap-3 transition-all duration-200">
+          <span id="submit-label" x-text="studioActive ? 'Process Custom Matrix Layout' : 'Convert to Landscape'">Convert to Landscape</span>
+          <svg id="submit-arrow" width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <path d="M4 9H14M14 9L10 5M14 9L10 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+          <svg id="submit-spinner" class="hidden animate-spin" width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <circle cx="9" cy="9" r="7" stroke="currentColor" stroke-width="1.8" stroke-dasharray="22" stroke-dashoffset="8" stroke-linecap="round"/>
+          </svg>
+        </button>
+
+      </form>
+
+      <div class="flex items-center justify-center gap-2 mt-6">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C9A84C" stroke-width="2" class="opacity-40 flex-shrink-0">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </svg>
+        <p class="text-ivory-dim/50 text-xs tracking-wide">
+          Your files are permanently deleted from processing streams immediately following calculation bounds.
+        </p>
+      </div>
+    </div>
+
+    <div class="mt-8 grid grid-cols-3 gap-4">
+      <div class="glass-card rounded-xl p-4 text-center">
+        <p class="font-display text-xl text-gold mb-1">1200×1600</p>
+        <p class="text-ivory-dim text-xs">Canvas Layout</p>
+      </div>
+      <div class="glass-card rounded-xl p-4 text-center">
+        <p class="font-display text-xl text-gold mb-1">300 DPI</p>
+        <p class="text-ivory-dim text-xs">Print Ready Quality</p>
+      </div>
+      <div class="glass-card rounded-xl p-4 text-center">
+        <p class="font-display text-xl text-gold mb-1">&lt; 3s</p>
+        <p class="text-ivory-dim text-xs">Execution Bounds</p>
+      </div>
+    </div>
+
+    {% if not user.is_authenticated or user.conversion_quota.conversions_allowed <= 3 %}
+    <div class="mt-6">
+      <div class="glass-card rounded-xl px-5 py-4 flex items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-lg border border-gold/30 flex items-center justify-center flex-shrink-0" style="background: #C9A84C0D;">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M8 1L9.8 6H15L10.6 9.2L12.4 14.2L8 11L3.6 14.2L5.4 9.2L1 6H6.2L8 1Z" fill="#C9A84C"/>
+            </svg>
+          </div>
+          <p class="text-ivory-dim text-sm">
+            Running a shop or print business? <span class="text-ivory">Premium plans feature unrestricted batch limits.</span>
+          </p>
+        </div>
+        <a href="{% url 'landing:index' %}#pricing" class="flex-shrink-0 btn-ghost px-4 py-2 rounded-lg text-xs font-medium whitespace-nowrap">
+          View Plans
+        </a>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ALPINE ENGINE VIEWPORT TRANSFORMATION STATE ENGINE
+function studioEngine() {
+  return {
+    studioActive: false,
+    focusedZone: null,
+    focusedZoneCard: null,
+    frontImageSource: '',
+    backImageSource: '',
+    
+    // Core Float ratio coordinates mapping schema directly matched to standard processing engine configuration rules
+    zones: {
+      front: {},
+      back: {}
+    },
+
+    initEngine() {
+      this.resetToDefaultLayout();
+    },
+
+    // CRITICAL UPDATE: Exact alignment map with canonical backend processing engines
+    resetToDefaultLayout() {
+ // Paste this directly inside your studioEngine() init / default layout declaration
+this.zones = {
+  front: {
+    "photo_main":           { x1: 0.2922, y1: 0.1292, x2: 0.6878, y2: 0.4764 },
+    "name_field":           { x1: 0.1200, y1: 0.5800, x2: 0.8800, y2: 0.6500 },
+    "dob_field":            { x1: 0.1200, y1: 0.6750, x2: 0.8800, y2: 0.7020 },
+    "sex_field":            { x1: 0.1200, y1: 0.7200, x2: 0.5500, y2: 0.7500 },
+    "expiry_field":         { x1: 0.1200, y1: 0.7780, x2: 0.6500, y2: 0.8120 },
+    "barcode_area":         { x1: 0.2700, y1: 0.8320, x2: 0.6700, y2: 0.9210 },
+    "vertical_strip_left":  { x1: 0.8900, y1: 0.1500, x2: 0.9600, y2: 0.3370 },
+    "vertical_strip_right": { x1: 0.8914, y1: 0.351, x2: 0.9563, y2: 0.5007 }
+  },
+  back: {
+    "qr_area":              { x1: 0.1000, y1: 0.1090, x2: 0.9000, y2: 0.6200 },
+    "phone_field":          { x1: 0.0900, y1: 0.6630, x2: 0.4500, y2: 0.6980 },
+    "fin_value":            { x1: 0.6280, y1: 0.6500, x2: 0.9280, y2: 0.6850 },
+    "address_field":        { x1: 0.0893, y1: 0.7954, x2: 0.9275, y2: 0.9734 }
+  }
+};
+},
+
+    cleanZoneName(key) {
+      if (!key) return '';
+      return key.replace(/_/g, ' ');
+    },
+
+    // Maps absolute coordinate ranges into safe responsive percentage layouts
+    getBoxStyle(card, key) {
+      const box = this.zones[card][key];
+      if (!box) return '';
+      
+      const left = box.x1 * 100;
+      const top = box.y1 * 100;
+      const width = (box.x2 - box.x1) * 100;
+      const height = (box.y2 - box.y1) * 100;
+      
+      return `left: ${left}%; top: ${top}%; width: ${width}%; height: ${height}%;`;
+    },
+
+    selectZone(card, key, event) {
+      this.focusedZone = key;
+      this.focusedZoneCard = card;
+      
+      const box = this.zones[card][key];
+      const container = document.getElementById(`viewport-container-${card}`);
+      const rect = container.getBoundingClientRect();
+      
+      const clientX = event.clientX || event.touches?.[0]?.clientX;
+      const clientY = event.clientY || event.touches?.[0]?.clientY;
+      
+      const startX = clientX;
+      const startY = clientY;
+      
+      const originalX1 = box.x1;
+      const originalY1 = box.y1;
+      const originalWidth = box.x2 - box.x1;
+      const originalHeight = box.y2 - box.y1;
+
+      const handleMove = (moveEvent) => {
+        const curX = moveEvent.clientX ?? moveEvent.touches?.[0]?.clientX;
+        const curY = moveEvent.clientY ?? moveEvent.touches?.[0]?.clientY;
+        
+        const deltaX = (curX - startX) / rect.width;
+        const deltaY = (curY - startY) / rect.height;
+        
+        let newX1 = Math.max(0, Math.min(1 - originalWidth, originalX1 + deltaX));
+        let newY1 = Math.max(0, Math.min(1 - originalHeight, originalY1 + deltaY));
+        
+        box.x1 = parseFloat(newX1.toFixed(4));
+        box.y1 = parseFloat(newY1.toFixed(4));
+        box.x2 = parseFloat((newX1 + originalWidth).toFixed(4));
+        box.y2 = parseFloat((newY1 + originalHeight).toFixed(4));
+      };
+
+      const handleUp = () => {
+        window.removeEventListener('mousemove', handleMove);
+        window.removeEventListener('mouseup', handleUp);
+        window.removeEventListener('touchmove', handleMove);
+        window.removeEventListener('touchend', handleUp);
+      };
+
+      window.addEventListener('mousemove', handleMove);
+      window.addEventListener('mouseup', handleUp);
+      window.addEventListener('touchmove', handleMove, { passive: false });
+      window.addEventListener('touchend', handleUp);
+    },
+
+    startResizing(card, key, event) {
+      const box = this.zones[card][key];
+      const container = document.getElementById(`viewport-container-${card}`);
+      const rect = container.getBoundingClientRect();
+      
+      const originalX1 = box.x1;
+      const originalY1 = box.y1;
+
+      const handleResizeMove = (moveEvent) => {
+        const curX = moveEvent.clientX ?? moveEvent.touches?.[0]?.clientX;
+        const curY = moveEvent.clientY ?? moveEvent.touches?.[0]?.clientY;
+        
+        const currentXRelative = (curX - rect.left) / rect.width;
+        const currentYRelative = (curY - rect.top) / rect.height;
+        
+        const targetX2 = Math.max(originalX1 + 0.05, Math.min(1.0, currentXRelative));
+        const targetY2 = Math.max(originalY1 + 0.05, Math.min(1.0, currentYRelative));
+        
+        box.x2 = parseFloat(targetX2.toFixed(4));
+        box.y2 = parseFloat(targetY2.toFixed(4));
+      };
+
+      const handleResizeUp = () => {
+        window.removeEventListener('mousemove', handleResizeMove);
+        window.removeEventListener('mouseup', handleResizeUp);
+        window.removeEventListener('touchmove', handleResizeMove);
+        window.removeEventListener('touchend', handleResizeUp);
+      };
+
+      window.addEventListener('mousemove', handleResizeMove);
+      window.addEventListener('mouseup', handleResizeUp);
+      window.addEventListener('touchmove', handleResizeMove, { passive: false });
+      window.addEventListener('touchend', handleResizeUp);
+    },
+
+    exitStudioWorkspace() {
+      this.studioActive = false;
+      this.focusedZone = null;
+      this.focusedZoneCard = null;
+      this.frontImageSource = '';
+      this.backImageSource = '';
+      
+      document.getElementById('input-file-front').value = '';
+      document.getElementById('input-file-back').value = '';
+      
+      if (typeof Persistence !== 'undefined') {
+        sessionStorage.removeItem('front_id_image');
+        sessionStorage.removeItem('back_id_image');
+      }
+
+      document.getElementById('default-front').classList.remove('hidden');
+      document.getElementById('selected-front').classList.add('hidden');
+      document.getElementById('default-back').classList.remove('hidden');
+      document.getElementById('selected-back').classList.add('hidden');
+    }
+  };
+}
+
+// UNIFIED PIPELINE INTEGRATION RUNTIME WRAPPER
+(function () {
+  const tabPdf     = document.getElementById('tab-pdf');
+  const tabImages  = document.getElementById('tab-images');
+  const panelPdf   = document.getElementById('panel-pdf');
+  const panelImages= document.getElementById('panel-images');
+  const modeInput  = document.getElementById('id_upload_mode');
+
+  const form           = document.getElementById('upload-form');
+  const submitBtn      = document.getElementById('submit-btn');
+  const submitLabel    = document.getElementById('submit-label');
+  const submitArrow    = document.getElementById('submit-arrow');
+  const submitSpinner  = document.getElementById('submit-spinner');
+  const errorContainer = document.getElementById('error-container');
+  const errorList      = document.getElementById('error-list');
+  const progressCon    = document.getElementById('progress-container');
+  const progressBar    = document.getElementById('progress-bar');
+  const progressLbl    = document.getElementById('progress-label');
+  const progressPct    = document.getElementById('progress-percentage');
+
+  function formatBytes(bytes) {
+    if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + ' MB';
+    if (bytes >= 1024)    return (bytes / 1024).toFixed(0) + ' KB';
+    return bytes + ' B';
+  }
+
+  function clearErrors() {
+    errorContainer.classList.add('hidden');
+    errorList.innerHTML = '';
+  }
+
+  function renderError(message) {
+    errorList.innerHTML += `
+      <p class="flex items-center gap-2">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="flex-shrink-0"><circle cx="7" cy="7" r="6" stroke="#EF4444" stroke-width="1.2"/><path d="M5 5l4 4M9 5L5 9" stroke="#EF4444" stroke-width="1.3" stroke-linecap="round"/></svg>
+        ${message}
+      </p>
+    `;
+    errorContainer.classList.remove('hidden');
+  }
+
+  tabPdf.addEventListener('click', () => toggleMode('pdf'));
+  tabImages.addEventListener('click', () => toggleMode('images'));
+
+  function toggleMode(mode) {
+    clearErrors();
+    modeInput.value = mode;
+    
+    const activeBtnClass = ["bg-gold", "text-black", "shadow-lg", "shadow-gold/10"];
+    const inactiveBtnClass = ["text-ivory-dim", "hover:text-ivory"];
+
+    if (mode === 'pdf') {
+      tabPdf.classList.add(...activeBtnClass);
+      tabPdf.classList.remove(...inactiveBtnClass);
+      tabImages.classList.remove(...activeBtnClass);
+      tabImages.classList.add(...inactiveBtnClass);
+      
+      panelPdf.classList.remove('hidden');
+      panelImages.classList.add('hidden');
+    } else {
+      tabImages.classList.add(...activeBtnClass);
+      tabImages.classList.remove(...inactiveBtnClass);
+      tabPdf.classList.remove(...activeBtnClass);
+      tabPdf.classList.add(...inactiveBtnClass);
+      
+      panelImages.classList.remove('hidden');
+      panelPdf.classList.add('hidden');
+    }
+  }
+
+  function setupDropZone({ zoneId, inputId, defaultId, selectedId, overlayId, changeBtnId, onFileSelected }) {
+    const zone = document.getElementById(zoneId);
+    const input = document.getElementById(inputId);
+    const defaultView = document.getElementById(defaultId);
+    const selectedView = document.getElementById(selectedId);
+    const overlay = document.getElementById(overlayId);
+    
+    let dragCounter = 0;
+
+    zone.addEventListener('click', (e) => {
+      if (changeBtnId && e.target.id === changeBtnId) {
+        e.preventDefault();
+        input.click();
+      } else if (defaultView.classList.contains('hidden')) {
+        return; 
+      } else {
+        input.click();
+      }
+    });
+
+    input.addEventListener('change', function() {
+      if (this.files.length > 0) processFile(this.files[0]);
+    });
+
+    zone.addEventListener('dragenter', (e) => {
+      e.preventDefault();
+      dragCounter++;
+      overlay.classList.remove('hidden');
+      overlay.classList.add('flex');
+    });
+
+    zone.addEventListener('dragover', (e) => e.preventDefault());
+
+    zone.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      dragCounter--;
+      if (dragCounter === 0) {
+        overlay.classList.add('hidden');
+        overlay.classList.remove('flex');
+      }
+    });
+
+    zone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dragCounter = 0;
+      overlay.classList.add('hidden');
+      overlay.classList.remove('flex');
+      
+      if (e.dataTransfer.files.length > 0) {
+        processFile(e.dataTransfer.files[0]);
+      }
+    });
+
+    function processFile(file) {
+      clearErrors();
+      
+      // Perform safety validation calculations based on the input type standard
+      if (inputId === 'input-file-pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+        renderError("Invalid document standard. Please upload an e-Fayda PDF asset.");
+        return;
+      }
+      if ((inputId === 'input-file-front' || inputId === 'input-file-back') && !file.type.startsWith('image/')) {
+        renderError("Invalid media format. Please upload a valid card profile image (PNG, JPG, WEBP).");
+        return;
+      }
+
+      defaultView.classList.add('hidden');
+      selectedView.classList.remove('hidden');
+
+      if (onFileSelected) {
+        onFileSelected(file, zone);
+      }
+    }
+  }
+
+  // Initialize System Matrix Drop Zones
+  setupDropZone({
+    zoneId: 'drop-zone-pdf',
+    inputId: 'input-file-pdf',
+    defaultId: 'default-pdf',
+    selectedId: 'selected-pdf',
+    overlayId: 'overlay-pdf',
+    changeBtnId: 'change-pdf-btn',
+    onFileSelected: (file, container) => {
+      container.querySelector('.filename-label').textContent = file.name;
+      container.querySelector('.filesize-label').textContent = formatBytes(file.size);
+    }
+  });
+
+  setupDropZone({
+    zoneId: 'drop-zone-front',
+    inputId: 'input-file-front',
+    defaultId: 'default-front',
+    selectedId: 'selected-front',
+    overlayId: 'overlay-front',
+    changeBtnId: 'change-front-btn',
+    onFileSelected: (file, container) => {
+      container.querySelector('.filename-label').textContent = file.name;
+      if (file.type.startsWith('image/')) {
+        const url = URL.createObjectURL(file);
+        container.querySelector('.thumbnail-element').src = url;
+        
+        // Feed file stream directly to the Alpine workspace context
+        const alpine = Alpine.$data(document.getElementById('studio-root'));
+        alpine.frontImageSource = url;
+        Persistence.save('front_id_image', file);
+        
+        if (alpine.frontImageSource && alpine.backImageSource) {
+          alpine.studioActive = true;
+        }
+      }
+    }
+  });
+
+  setupDropZone({
+    zoneId: 'drop-zone-back',
+    inputId: 'input-file-back',
+    defaultId: 'default-back',
+    selectedId: 'selected-back',
+    overlayId: 'overlay-back',
+    changeBtnId: 'change-back-btn',
+    onFileSelected: (file, container) => {
+      container.querySelector('.filename-label').textContent = file.name;
+      if (file.type.startsWith('image/')) {
+        const url = URL.createObjectURL(file);
+        container.querySelector('.thumbnail-element').src = url;
+        
+        // Feed file stream directly to the Alpine workspace context
+        const alpine = Alpine.$data(document.getElementById('studio-root'));
+        alpine.backImageSource = url;
+        Persistence.save('back_id_image', file);
+        
+        if (alpine.frontImageSource && alpine.backImageSource) {
+          alpine.studioActive = true;
+        }
+      }
+    }
+  });
+
+  // Intercept Form Submission and Run Cinematic Transformation Routine
+  form.addEventListener('submit', function (e) {
+    clearErrors();
+    const mode = modeInput.value;
+    
+    if (mode === 'images') {
+      const alpine = Alpine.$data(document.getElementById('studio-root'));
+      if (!alpine.frontImageSource || !alpine.backImageSource) {
+        e.preventDefault();
+        renderError("Calculation bounds require both front and back alignment matrix targets.");
+        return;
+      }
+    } else {
+      const pdfInput = document.getElementById('input-file-pdf');
+      if (!pdfInput.files || pdfInput.files.length === 0) {
+        e.preventDefault();
+        renderError("Please provide an e-Fayda PDF vector document to initialize calculation loops.");
+        return;
+      }
+    }
+    
+    // Halt natural submission to cycle through the custom premium loading workflow
+    e.preventDefault();
+    
+    submitBtn.disabled = true;
+    submitArrow.classList.add('hidden');
+    submitSpinner.classList.remove('hidden');
+    progressCon.classList.remove('hidden');
+    
+    let progress = 0;
+    const interval = setInterval(() => {
+      progress += 4;
+      if (progress > 100) progress = 100;
+      
+      progressBar.style.width = `${progress}%`;
+      progressPct.textContent = `${progress}%`;
+      
+      if (progress < 25) {
+        progressLbl.textContent = "Reading file binaries and stream fragments...";
+      } else if (progress < 55) {
+        progressLbl.textContent = "Analyzing matrix alignments and custom vector fields...";
+      } else if (progress < 85) {
+        progressLbl.textContent = "Executing high-DPI landscape matrix coordinate calculations...";
+      } else {
+        progressLbl.textContent = "Finalizing luxury print-ready asset rendering bounds...";
+      }
+      
+      if (progress >= 100) {
+        clearInterval(interval);
+        setTimeout(() => {
+          // Erase persistence records immediately before submission processing
+          sessionStorage.removeItem('front_id_image');
+          sessionStorage.removeItem('back_id_image');
+          form.submit();
+        }, 200);
+      }
+    }, 60);
+  });
+})();
+
+// Client-Side Cache Recovery & Persistence Architecture
+const ENABLE_PERSISTENCE = true;
+const Persistence = {
+  save: (key, file) => {
+    if (!ENABLE_PERSISTENCE) return;
+    const reader = new FileReader();
+    reader.onload = (e) => sessionStorage.setItem(key, e.target.result);
+    reader.readAsDataURL(file);
+  },
+  load: (key, imgElementId, defaultId, selectedId, zoneType) => {
+    if (!ENABLE_PERSISTENCE) return;
+    const data = sessionStorage.getItem(key);
+    if (data) {
+      const targetImg = document.getElementById(imgElementId);
+      if (targetImg) targetImg.src = data;
+      
+      document.getElementById(defaultId).classList.add('hidden');
+      document.getElementById(selectedId).classList.remove('hidden');
+      
+      // Sync parameters to Alpine runtime layer instantly
+      const alpine = Alpine.$data(document.getElementById('studio-root'));
+      if (zoneType === 'front') {
+        alpine.frontImageSource = data;
+      } else if (zoneType === 'back') {
+        alpine.backImageSource = data;
+      }
+      
+      if (alpine.frontImageSource && alpine.backImageSource) {
+        alpine.studioActive = true;
+      }
+    }
+  }
+};
+
+// Handle Cache Recovery Executions on DOM Mounts
+// Handle Cache Recovery and Browser Navigation State Safeguards
+window.addEventListener('pageshow', () => {
+  setTimeout(() => {
+    const alpine = Alpine.$data(document.getElementById('studio-root'));
+    const frontData = sessionStorage.getItem('front_id_image');
+    const backData = sessionStorage.getItem('back_id_image');
+
+    // Strict validation: Studio workspace only initializes if BOTH sources exist cleanly
+    if (!frontData || !backData) {
+      if (alpine) {
+        alpine.exitStudioWorkspace();
+      }
+      
+      // Defensively reset submission controls to normal operational states
+      const btn = document.getElementById('submit-btn');
+      const arrow = document.getElementById('submit-arrow');
+      const spinner = document.getElementById('submit-spinner');
+      const progressContainer = document.getElementById('progress-container');
+      
+      if (btn) btn.disabled = false;
+      if (arrow) arrow.classList.remove('hidden');
+      if (spinner) spinner.classList.add('hidden');
+      if (progressContainer) progressContainer.classList.add('hidden');
+    } else {
+      Persistence.load('front_id_image', 'rendered-front-cache-src', 'default-front', 'selected-front', 'front');
+      Persistence.load('back_id_image', 'rendered-back-cache-src', 'default-back', 'selected-back', 'back');
+    }
+  }, 50);
+});
+</script>
+{% endblock %}
