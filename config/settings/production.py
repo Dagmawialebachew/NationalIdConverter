@@ -64,7 +64,7 @@ CSRF_COOKIE_SECURE    = True
 DATABASES["default"]["OPTIONS"] = {  # type: ignore[index]
     "sslmode": "require",
 }
-DATABASES["default"]["CONN_MAX_AGE"] = 600  # type: ignore[index]
+DATABASES["default"]["CONN_MAX_AGE"] = 0 # type: ignore[index]
 
 # ─── Email ────────────────────────────────────────────────────────────────────
 # Configure SMTP for production email (allauth verification emails)
@@ -75,13 +75,14 @@ EMAIL_USE_TLS       = True
 EMAIL_HOST_USER     = env("EMAIL_HOST_USER",     default="")
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
 DEFAULT_FROM_EMAIL  = env("DEFAULT_FROM_EMAIL",  default="noreply@faydaconverter.com")
-
+EMAIL_TIMEOUT       = 5
 # ─── Static Files ─────────────────────────────────────────────────────────────
 # WhiteNoise serves static files directly — no nginx needed on Render
 # Already configured in base.py
 
 # ─── Allauth: enforce email verification in production ────────────────────────
 ACCOUNT_EMAIL_VERIFICATION = "mandatory"
+SOCIALACCOUNT_EMAIL_VERIFICATION = "none"
 
 # ─── Logging: INFO in production ─────────────────────────────────────────────
 LOGGING["root"]["level"] = "INFO"  # type: ignore[index]
