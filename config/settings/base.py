@@ -146,9 +146,11 @@ SITE_ID = 1
 ACCOUNT_USER_MODEL_USERNAME_FIELD = None             # CustomUser has no username field
 ACCOUNT_LOGIN_METHODS             = {"email"}        # Email-only authentication
 ACCOUNT_SIGNUP_FIELDS             = ["email*", "password1*", "password2*"] # Fields required for signup
-ACCOUNT_UNIQUE_EMAIL              = True
 ACCOUNT_EMAIL_VERIFICATION        = "mandatory"      # Must verify email to login
-
+ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_UNIQUE_EMAIL = True
+ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
+ACCOUNT_AUTHENTICATION_METHOD = "email"
 LOGIN_REDIRECT_URL                = "/convert/"      # After login → upload page
 LOGOUT_REDIRECT_URL               = "/"              # After logout → landing page
 LOGIN_URL                         = "/auth/login/"
@@ -235,5 +237,8 @@ LOGGING = {
         },
     },
 }
+
+
+ACCOUNT_ADAPTER = 'apps.accounts.adapters.AntiExploitAccountAdapter'
 
 

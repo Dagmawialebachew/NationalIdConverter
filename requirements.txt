@@ -19,6 +19,7 @@ django-allauth==65.17.0
 django-crispy-forms==2.6
 django-environ==0.13.0
 django-jazzmin==3.0.4
+dnspython==2.8.0
 filelock==3.29.0
 fsspec==2026.4.0
 future==1.0.0

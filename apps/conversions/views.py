@@ -39,7 +39,7 @@ from core.constants import FREE_DAILY_LIMIT
 # App Specifics
 from apps.conversions.forms import UploadForm
 from apps.conversions.models import ConversionJob
-from fayda_converter_v2 import extract_slices, render_layout_from_slices
+from fayda_converter_v2 import extract_slices, render_layout_from_slices, apply_amharic_watermark
 from .signals import job_downloaded
 
 logger = logging.getLogger(__name__)
@@ -275,10 +275,18 @@ class ResultView(LoginRequiredMixin, OwnerRequiredMixin, PageTitleMixin, DetailV
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         job = self.object
+        
+        # --- ADD THIS RUNTIME EVALUATION LAYER ---
+        try:
+            is_free_trial = self.request.user.conversion_quota.conversions_allowed == FREE_DAILY_LIMIT
+        except Exception:
+            is_free_trial = True
+        # -----------------------------------------
+
         context["download_url"] = reverse("conversions:download", kwargs={"pk": job.id})
         context["is_downloadable"] = job.is_downloadable
         context["is_failed"] = job.is_failed
-        context["is_watermarked"] = job.watermarked
+        context["is_watermarked"] = is_free_trial  # <-- ADD THIS KEY
         return context
 
 
@@ -301,8 +309,20 @@ class DownloadView(LoginRequiredMixin, View):
             return redirect("conversions:upload")
 
         filename = build_output_filename(str(job.id))
+        
+        # --- WATERMARK EXECUTION LAYER ---
+        content_bytes = bytes(job.output_bytes)
+        try:
+            is_free_trial = request.user.conversion_quota.conversions_allowed == FREE_DAILY_LIMIT
+        except Exception:
+            is_free_trial = True
+
+        if is_free_trial:
+            content_bytes = apply_amharic_watermark(content_bytes)
+        # ---------------------------------
+
         response = file_download_response(
-            content=bytes(job.output_bytes),
+            content=content_bytes,
             filename=filename,
             content_type="image/jpeg",
         )
@@ -337,7 +357,18 @@ class ImageView(LoginRequiredMixin, View):
         if not job.output_bytes:
             raise Http404("Image not available.")
 
-        return HttpResponse(job.output_bytes, content_type="image/jpeg")
+        # --- WATERMARK EXECUTION LAYER ---
+        output_bytes = bytes(job.output_bytes)
+        try:
+            is_free_trial = request.user.conversion_quota.conversions_allowed == FREE_DAILY_LIMIT
+        except Exception:
+            is_free_trial = True
+
+        if is_free_trial:
+            output_bytes = apply_amharic_watermark(output_bytes)
+        # ---------------------------------
+
+        return HttpResponse(output_bytes, content_type="image/jpeg")
 
 
 # ─── Adjust View (Field Adjustment Studio) ────────────────────────────────────
@@ -346,7 +377,7 @@ class ImageView(LoginRequiredMixin, View):
 class AdjustView(LoginRequiredMixin, View):
     """
     Processes interactive Canvas matrix transforms live via cached asset slices.
-     Locked behind absolute auth pipelines to protect compute resources.
+      Locked behind absolute auth pipelines to protect compute resources.
     """
     http_method_names = ["post"]
     _TW = 2360
@@ -423,6 +454,16 @@ class AdjustView(LoginRequiredMixin, View):
             logger.info("AdjustView: persisted finalized coordinates for job=%s (%d bytes)", pk, len(new_output))
             return JsonResponse({"ok": True})
         else:
+            # --- WATERMARK EXECUTION LAYER ---
+            try:
+                is_free_trial = request.user.conversion_quota.conversions_allowed == FREE_DAILY_LIMIT
+            except Exception:
+                is_free_trial = True
+
+            if is_free_trial:
+                new_output = apply_amharic_watermark(new_output)
+            # ---------------------------------
+            
             return HttpResponse(new_output, content_type="image/jpeg")
 
     @staticmethod

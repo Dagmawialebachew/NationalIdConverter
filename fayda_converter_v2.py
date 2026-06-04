@@ -507,6 +507,53 @@ def _resolve_output_zones(output_zones: dict):
 # REFACTORED HIGH-PERFORMANCE RENDERING PIPELINE
 # ==============================================================================
 
+
+# Insert directly below BACK_ZONES definition
+
+def apply_amharic_watermark(image_bytes: bytes) -> bytes:
+    """
+    Applies a semi-transparent Amharic watermark on-the-fly.
+    Operates strictly in memory via bytes for maximum processing speed.
+    """
+    img = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
+    txt_layer = Image.new("RGBA", img.size, (255, 255, 255, 0))
+    draw = ImageDraw.Draw(txt_layer)
+    
+    # Pre-calculated safe system font paths
+    font_paths = ["Nyala.ttf", "AbyssinicaSIL-R.ttf", "AbyssinicaSIL.ttf", "arialbd.ttf", "FreeSansBold.ttf"]
+    font = None
+    for path in font_paths:
+        try:
+            font = ImageFont.truetype(path, 55)
+            break
+        except Exception:
+            continue
+            
+    if not font:
+        font = ImageFont.load_default()
+        
+    h = img.size[1]
+    text_amharic = "ናሙና"
+    text_english = "PREVIEW ONLY"
+    is_default = (font.__class__.__name__ == 'ImageDefaultFont')
+    
+    # Exact center points of Front (590px) and Back (1770px) hemispheres
+    centers = [590, 1770]
+    for cx in centers:
+        if is_default:
+            draw.text((cx - 180, h // 2 - 30), "SAMPLE PROOF", fill=(20, 24, 33, 40))
+            draw.text((cx - 180, h // 2 + 10), "PREVIEW ONLY", fill=(20, 24, 33, 40))
+        else:
+            # High-end charcoal tone at ~15% opacity overlay
+            draw.text((cx - 60, h // 2 - 50), text_amharic, fill=(20, 24, 33, 38), font=font)
+            draw.text((cx - 160, h // 2 + 15), text_english, fill=(20, 24, 33, 38), font=font)
+            
+    composite = Image.alpha_composite(img, txt_layer).convert("RGB")
+    output_buffer = io.BytesIO()
+    composite.save(output_buffer, format="JPEG", quality=95, optimize=True)
+    return output_buffer.getvalue()
+
+
 def extract_slices(
     file_bytes_one: bytes, filename_one: str,
     file_bytes_two: bytes, filename_two: str,

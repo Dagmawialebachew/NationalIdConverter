@@ -83,8 +83,7 @@
       <div class="mb-8">
         <div class="rounded-2xl overflow-hidden border border-white/10 shadow-inner relative"
              style="aspect-ratio: 1.587; background: #121217;">
-          <img id="result-preview-img" src="{% url 'conversions:image' job.id %}" alt="Converted ID" class="w-full h-full object-contain" />
-          {% if is_watermarked %}
+<img id="result-preview-img" src="{% url 'conversions:image' job.id %}" alt="Converted ID" class="w-full h-full object-contain cursor-zoom-in" />          {% if is_watermarked %}
           <div class="absolute top-4 right-4 px-3 py-1 rounded-full border border-gold/30 bg-gold/10 text-[9px] tracking-widest uppercase text-gold font-bold backdrop-blur-sm">Watermarked</div>
           {% else %}
           <div class="absolute top-4 right-4 px-3 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-[9px] tracking-widest uppercase text-emerald-400 font-bold backdrop-blur-sm">Clean</div>
@@ -155,28 +154,20 @@
         </p>
       </div>
     </div>
-
-    {% if is_watermarked %}
-    <div class="mt-8 reveal reveal-3">
-      <div class="glass-card rounded-3xl p-6 border border-gold/10 bg-gold/[0.03]">
-        <div class="flex items-center gap-4">
-          <div class="w-12 h-12 rounded-2xl border border-gold/30 flex items-center justify-center flex-shrink-0 bg-gold/5">
-            <svg width="20" height="20" viewBox="0 0 18 18" fill="none">
-              <path d="M9 1L10.8 6.5H16.5L11.8 9.7L13.6 15.3L9 12L4.4 15.3L6.2 9.7L1.5 6.5H7.2L9 1Z" fill="#C9A84C"/>
-            </svg>
-          </div>
-          <div class="flex-1">
-            <p class="text-ivory font-medium mb-0.5">Get a clean, professional finish</p>
-            <p class="text-ivory-dim text-xs leading-relaxed mb-3">Upgrade to Premium for watermark-free, high-fidelity results. Starts at 50 Birr.</p>
-            <a href="{% url 'landing:index' %}#pricing"
-               class="inline-flex items-center gap-1.5 text-gold text-xs font-bold uppercase tracking-wider hover:underline underline-offset-4">
-              View Pricing &rarr;
-            </a>
-          </div>
+{% if is_watermarked %}
+    <div class="watermark-notice-banner bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 mb-6 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <span class="text-2xl">💡</span>
+            <div>
+                <h4 class="text-amber-400 font-bold mt-4 text-sm font-sans">የሙከራ ሁኔታ (Preview Mode Enabled)</h4>
+                <p class="text-xs text-gray-400 mt-0.5">የነጻ አጠቃቀም ክሬዲት እየተጠቀሙ ስለሆነ ምስሉ ላይ ምልክት ተደርጓል። ሙሉውን ያለ ምልክት ለማውረድ አካውንትዎን ያሻሽሉ።</p>
+            </div>
         </div>
-      </div>
+        <a href="{% url 'landing:index' %}#pricing" class="bg-amber-500 hover:bg-amber-600 text-neutral-950 font-bold px-4 py-2 rounded-lg text-xs transition duration-200">
+            ክሬዲት ግዛ (Buy Premium Credits)
+        </a>
     </div>
-    {% endif %}
+{% endif %}
 
     <div class="mt-8 text-center reveal reveal-4">
       <p class="text-ivory-dim/30 text-xs tracking-wide">Secure processing via Fayda Converter</p>
@@ -573,18 +564,42 @@
 {% endif %}
 {# ════════════════════════════════════════════════════════════════════════════ #}
 
+{# ── FULLSCREEN IMAGE LIGHTBOX OVERLAY ────────────────────────────────────── #}
+<div id="image-lightbox" 
+     class="fixed inset-0 z-[1000] bg-black/95 backdrop-blur-xl flex items-center justify-center opacity-0 pointer-events-none transition-all duration-300 ease-out"
+     style="display: none;">
+  
+  <button type="button" 
+          id="close-lightbox-btn" 
+          class="absolute top-6 right-6 w-12 h-12 rounded-full border border-white/10 bg-black/40 text-ivory-dim hover:text-white hover:border-white/30 flex items-center justify-center transition-all duration-200 z-50">
+    <svg width="20" height="20" viewBox="0 0 14 14" fill="none">
+      <path d="M3 3l8 8M11 3L3 11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+  </button>
+
+  <div class="relative w-full max-w-5xl px-4 md:px-12 max-h-[90vh] flex items-center justify-center lightbox-content">
+    <div class="absolute -inset-6 rounded-3xl opacity-20 blur-3xl pointer-events-none"
+         style="background: radial-gradient(circle, #C9A84C50 0%, transparent 85%);"></div>
+    <img id="lightbox-target-img" 
+         src="" 
+         alt="Full Screen ID View" 
+         class="max-w-full max-h-[85vh] rounded-xl object-contain border border-white/10 shadow-2xl scale-95 transition-transform duration-300 ease-out" />
+  </div>
+</div>
+
+
 {% endblock %}
 
 {% block extra_js %}
 <script>
 // ── Download button one-time visual feedback ─────────────────────────────────
 // ── Unified Download Handler & Visual Feedback ─────────────────────────────────
+// ── Unified Download Handler & Visual Feedback ─────────────────────────────────
 (function() {
   const btn = document.getElementById('download-btn');
   if (!btn) return;
 
   btn.addEventListener('click', function(e) {
-    // Prevent double submissions if clicked repeatedly during delay
     if (btn.classList.contains('pointer-events-none')) {
       e.preventDefault();
       return;
@@ -593,7 +608,6 @@
     const textSpan = btn.querySelector('.btn-text');
     if (textSpan) textSpan.textContent = 'Downloading...';
 
-    // Safely decrement navbar credit counter if it exists and isn't infinite
     const counter = document.querySelector('.navbar-credit-counter'); 
     if (counter && counter.textContent.trim() !== '∞') { 
       const currentCredits = parseInt(counter.textContent, 10);
@@ -605,12 +619,21 @@
     // Delay visual disabling just enough to let the browser dispatch the file download request
     setTimeout(() => { 
       btn.classList.add('opacity-50', 'pointer-events-none'); 
+      if (textSpan) textSpan.textContent = 'Link Expired';
       
       const note = document.querySelector('.text-ivory-dim.text-xs.leading-relaxed');
       if (note) {
         note.textContent = 'Download initiated. Link now expired.';
         note.classList.add('text-gold');
       }
+
+      // ── ADD THIS DELAYED RELOAD ──
+      // Gives the browser 2 seconds to initiate the file download window,
+      // then reloads the page to let Django display the "Already Downloaded" state.
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
+
     }, 150);
   });
 })()
@@ -949,5 +972,55 @@ function adjustmentStudio() {
     }
   };
 }
+
+// ── Fullscreen Lightbox Engine ──────────────────────────────────────────────
+(() => {
+  const previewImg = document.getElementById('result-preview-img');
+  const lightbox = document.getElementById('image-lightbox');
+  const lightboxImg = document.getElementById('lightbox-target-img');
+  const closeLightboxBtn = document.getElementById('close-lightbox-btn');
+
+  if (!previewImg || !lightbox || !lightboxImg) return;
+
+  const openLightbox = () => {
+    lightboxImg.src = previewImg.src;
+    lightbox.style.display = 'flex';
+    
+    // Trigger fluid animation transitions
+    setTimeout(() => {
+      lightbox.classList.remove('opacity-0', 'pointer-events-none');
+      lightboxImg.classList.remove('scale-95');
+    }, 15);
+  };
+
+  const closeLightbox = () => {
+    lightbox.classList.add('opacity-0', 'pointer-events-none');
+    lightboxImg.classList.add('scale-95');
+    
+    // Hide display clean up once animation sequence finishes
+    setTimeout(() => {
+      lightbox.style.display = 'none';
+    }, 300);
+  };
+
+  // Wire up action triggers
+  previewImg.addEventListener('click', openLightbox);
+  closeLightboxBtn?.addEventListener('click', closeLightbox);
+
+  // Close when clicking empty dark area outside the image card boundary
+  lightbox.addEventListener('click', (e) => {
+    if (!e.target.closest('.lightbox-content') && e.target !== lightboxImg) {
+      closeLightbox();
+    }
+  });
+
+  // Native keyboard dismissal support via Escape key
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && lightbox.style.display === 'flex') {
+      closeLightbox();
+    }
+  });
+})();
+
 </script>
 {% endblock %}

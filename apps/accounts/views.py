@@ -35,38 +35,36 @@ User   = get_user_model()
 
 
 # ─── Register ─────────────────────────────────────────────────────────────────
+# apps/accounts/views.py
 
 class RegisterView(PageTitleMixin, CreateView):
     """
-    New user registration.
-
-    On success: logs the user in immediately and redirects to upload page.
-    On failure: re-renders the form with validation errors.
+    New user registration with strict email confirmation workflow.
     """
-
     form_class     = RegisterForm
     template_name  = "accounts/register.html"
-    success_url    = reverse_lazy("conversions:upload")
+    
+    # Redirect directly to allauth's verification sent page view
+    success_url    = reverse_lazy("account_email_verification_sent")
     page_title     = "Create Your Account"
 
     def dispatch(self, request, *args, **kwargs):
-        # Already logged in — no need to register again
         if request.user.is_authenticated:
             return redirect("conversions:upload")
         return super().dispatch(request, *args, **kwargs)
 
     def form_valid(self, form):
+        # This saves the record into the DB
         user = form.save()
-
-        # Log the user in immediately after registration
-        login(self.request, user, backend="django.contrib.auth.backends.ModelBackend")
-
-        messages.success(
+        
+        # NOTE: Do NOT use the django login() method here. 
+        # Leaving them unauthenticated forces them to check their inbox.
+        
+        messages.info(
             self.request,
-            f"Welcome, {user.display_name}! Your account has been created."
+            "Account created successfully! A verification link has been sent. Please check your inbox before logging in."
         )
-        logger.info("RegisterView: new user registered email=%s", user.email)
-
+        logger.info("RegisterView: pending activation user initialized email=%s", user.email)
         return redirect(self.success_url)
 
     def form_invalid(self, form):
