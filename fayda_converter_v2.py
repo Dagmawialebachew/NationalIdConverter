@@ -82,21 +82,22 @@ def _get_oval_background(size):
     return bg
 
 
+import numpy as np
+import cv2
+from PIL import Image, ImageFilter, ImageChops, ImageDraw
+
 def remove_white_background(
     img: Image.Image,
-    threshold: int = 24,          # Global tolerance from seed color
-    local_threshold: int = 10,    # Edge guard: stops fill jumping over sharp lines
-    edge_shrink: int = 2,         
-    feather_radius: int = 5,      
+    threshold: int = 24,         
+    local_threshold: int = 10,    
+    edge_shrink: int = 1,        # Optimized down to preserve fine hair details
+    feather_radius: int = 3,      # Crisper edges for high-end UI rendering
     legacy_threshold: int = 240,
-    mode: str = "transparent"     # Options: "transparent" (small photo) or "vignette" (main photo)
+    mode: str = "transparent"     
 ) -> Image.Image:
     """
-    Remove the white/near-white background from an ID photo using edge-aware
-    dual-constraint flood-fill seeding + morphological soft-alpha feathering.
-    
-    Set mode="transparent" for clear alpha cutouts (small photo frame).
-    Set mode="vignette" for studio gradient backdrop + depth shadow (main photo frame).
+    Production-grade background extraction using global illumination matrix 
+    segmentation and structural contour protection layers.
     """
     try:
         return _remove_bg_numpy(img, threshold, local_threshold, edge_shrink, feather_radius, mode)
@@ -104,61 +105,86 @@ def remove_white_background(
         print(f"Fallback to legacy due to: {e}")
         return _remove_bg_legacy(img, legacy_threshold, mode)
 
+
 def _remove_bg_numpy(
     img: Image.Image,
     threshold: int,
     local_threshold: int,
     edge_shrink: int,
     feather_radius: int,
-    mode: str = "transparent"  # Param restored and handled correctly
+    mode: str = "transparent"
 ) -> Image.Image:
+    # 1. Convert to NumPy arrays for high-performance matrix operations
+    src_rgb = np.array(img.convert("RGB"))
+    h, w, _ = src_rgb.shape
+    
+    # 2. Translate to LAB Color Space to isolate illumination (L) from color (A, B)
+    # This prevents variations in skin tone or shirt colors from throwing off the mask
+    lab = cv2.cvtColor(src_rgb, cv2.COLOR_RGB2LAB)
+    l_channel, a_channel, b_channel = cv2.split(lab)
+    
+    # Apply bilateral filtering to eliminate JPEG compression blocks while keeping edges razor-sharp
+    filtered_l = cv2.bilateralFilter(l_channel, 7, 65, 65)
+    
+    # 3. Generate a Global Luminance Mask using Otsu's adaptive binarization
+    _, alpha_mask = cv2.threshold(filtered_l, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    
+    # Hard clamp absolute high-luminance pixels to ensure clean background cuts
+    absolute_bg = (l_channel > 210)
+    alpha_mask[absolute_bg] = 0
+    
+    # 4. Connected Components Topology Analysis
+    # This treats the person's profile as a single solid entity, blocking all background leakage
+    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(alpha_mask, connectivity=8)
+    
+    refined_mask = np.zeros_like(alpha_mask)
+    if num_labels > 1:
+        # Sort components by area size, skipping index 0 (the global background frame)
+        sorted_indices = np.argsort(stats[1:, cv2.CC_STAT_AREA])[::-1] + 1
+        
+        # The largest continuous foreground component is always our subject
+        subject_idx = sorted_indices[0]
+        refined_mask[labels == subject_idx] = 255
+        
+        # Check for secondary detached components (like light-colored shirt shoulders or collars)
+        for idx in sorted_indices[1:]:
+            comp_area = stats[idx, cv2.CC_STAT_AREA]
+            comp_top = stats[idx, cv2.CC_STAT_TOP]
+            # If the component is significant and sits in the lower half of the frame, merge it
+            if comp_area > (h * w * 0.04) and (comp_top > int(h * 0.35)):
+                refined_mask[labels == idx] = 255
+
+    # 5. Structural Morphological Solidification
+    # Fill any small micro-holes inside the hair strands or clothes caused by highlights
+    kernel_close = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+    refined_mask = cv2.morphologyEx(refined_mask, cv2.MORPH_CLOSE, kernel_close, iterations=2)
+    
+    # 6. Smooth Alpha Edge Render
+    mask_pil = Image.fromarray(refined_mask, mode="L")
+    
+    if edge_shrink > 0:
+        mask_pil = mask_pil.filter(ImageFilter.MinFilter(3))
+        
+    # Apply subtle anti-aliasing to edge pixels to prevent a "choppy" cutout look
+    final_alpha = mask_pil.filter(ImageFilter.GaussianBlur(radius=feather_radius * 0.35))
+    
+    # 7. Alpha Layer Composition
     rgba = img.convert("RGBA")
-    rgb  = img.convert("RGB")
-    w, h = rgb.size
-
-    # 1. Run your edge-aware BFS flood fill
-    bg_mask = _flood_fill_background(np.array(rgb, dtype=np.float32), threshold, local_threshold)
-    bg_pil = Image.fromarray((bg_mask * 255).astype(np.uint8), mode="L")
-
-    # 2. Face Shield Protection Box
-    # Protects the central facial region from accidental flood leakages
-    protection_shield = Image.new("L", (w, h), 255) # Start fully transparent to background removal
-    draw = ImageDraw.Draw(protection_shield)
+    rgba.putalpha(final_alpha)
     
-    # Define face container boundaries (Left, Top, Right, Bottom)
-    pad_w = int(w * 0.22)  # Shields central 56% width (keeps hair/ears clear)
-    pad_h = int(h * 0.18)  # Shields forehead down to chest profile
-    
-    # Draw a solid black box (0 means: "Do NOT strip background here under any circumstance")
-    draw.rectangle([pad_w, pad_h, w - pad_w, h - pad_h], fill=0)
-    
-    # Soften the transition boundary to prevent hard, sharp box edges on hair/shoulders
-    protection_shield = protection_shield.filter(ImageFilter.GaussianBlur(radius=4))
-    
-    # Intersect the masks: Background is only wiped where BOTH algorithms agree it is background
-    bg_pil = ImageChops.multiply(bg_pil, protection_shield)
-
-    # 3. Morphological Soft-Alpha Feathering Pipeline
-    for _ in range(edge_shrink):
-        bg_pil = bg_pil.filter(ImageFilter.MinFilter(3))
-
-    feather_pil = bg_pil.copy()
-    for _ in range(feather_radius):
-        feather_pil = feather_pil.filter(ImageFilter.MaxFilter(3))
-
-    blurred = feather_pil.filter(ImageFilter.GaussianBlur(radius=feather_radius * 0.4))
-    alpha = ImageChops.invert(blurred)
-    
-    # Isolate subject canvas
-    subject_layer = rgba.copy()
-    subject_layer.putalpha(alpha)
-    return subject_layer
+    # If rendering the main photo, blend nicely onto a clean studio canvas layer
+    if mode == "vignette":
+        studio_canvas = Image.new("RGBA", (w, h), (255, 255, 255, 255))
+        # Optional: Add a high-end 5% subtle aesthetic drop-shadow beneath the subject
+        return Image.alpha_composite(studio_canvas, rgba)
+        
+    return rgba
 
 
 def _flood_fill_background(arr: np.ndarray, tolerance: int, local_tolerance: int) -> np.ndarray:
     """
-    Executes a BFS flood-fill guarded by both a global color constraint 
-    and a local neighborhood edge constraint to prevent highlight bleed.
+    Executes a high-accuracy BFS flood fill immune to dark cropping borders 
+    and subtle background compression gradients.
     """
     h, w = arr.shape[:2]
     visited = np.zeros((h, w), dtype=bool)
@@ -167,51 +193,55 @@ def _flood_fill_background(arr: np.ndarray, tolerance: int, local_tolerance: int
     from collections import deque
     queue = deque()
 
-    # Seed positions across the top row to ensure clean entry
-    top_seeds = [(0, int(c)) for c in np.linspace(0, w - 1, 9)]
-    for r, c in top_seeds:
-        if not visited[r, c]:
-            visited[r, c] = True
-            is_bg[r, c]   = True
-            queue.append((r, c, arr[r, c]))
+    # Define a clean, stable white background baseline configuration
+    bg_ref = np.array([245.0, 245.0, 245.0], dtype=np.float32)
+
+    # SEED SEARCH: Scan the outer boundaries but skip dark layout lines/borders
+    # Scan top rows for clean bright white entries
+    for c in range(w):
+        for r in range(min(6, h)):
+            if not visited[r, c] and np.all(arr[r, c] > 175):
+                visited[r, c] = True
+                is_bg[r, c]   = True
+                queue.append((r, c))
+                break
+
+    # Scan side tracks to catch edge-to-edge backdrop leaks
+    for r in range(h):
+        for c in [0, 1, w - 2, w - 1]:
+            if 0 <= c < w and not visited[r, c] and np.all(arr[r, c] > 175):
+                visited[r, c] = True
+                is_bg[r, c]   = True
+                queue.append((r, c))
 
     # Execution Loop
     while queue:
-        cr, cc, seed_color = queue.popleft()
+        cr, cc = queue.pop()
 
         for nr, nc in ((cr - 1, cc), (cr + 1, cc), (cr, cc - 1), (cr, cc + 1)):
             if 0 <= nr < h and 0 <= nc < w and not visited[nr, nc]:
                 current_pixel = arr[nr, nc]
                 parent_pixel  = arr[cr, cc]
 
-                # ── SPATIAL PROTECTION MATRIX ──
-                eff_tolerance = tolerance
-                eff_local_tolerance = local_tolerance
+                eff_tolerance = tolerance + 25  # Boost global headroom for compressed digital panels
+                eff_local_tolerance = local_tolerance + 10
 
-                # Lower canvas constraint clamping (Protects white shirts/ties/dresses)
-                if nr > int(h * 0.40):
-                    eff_tolerance = max(5, int(tolerance * 0.40))
-                    eff_local_tolerance = max(2, int(local_tolerance * 0.40))
-                    
-                    if int(w * 0.20) < nc < int(w * 0.80):
-                        eff_tolerance = max(2, int(tolerance * 0.15))
-                        eff_local_tolerance = max(1, int(local_tolerance * 0.15))
-                
-                # Upper-middle canvas boundary (Slightly relaxed since protection_shield covers the core face)
-                elif int(h * 0.18) < nr <= int(h * 0.40) and int(w * 0.25) < nc < int(w * 0.75):
-                    eff_tolerance = max(9, int(tolerance * 0.65))
-                    eff_local_tolerance = max(4, int(local_tolerance * 0.65))
+                # CLOTHES GUARD: Tighten constraints only in the center bottom quadrant 
+                # to keep white shirts/collars/dresses perfectly intact
+                if nr > int(h * 0.42) and int(w * 0.22) < nc < int(w * 0.78):
+                    eff_tolerance = max(5, int(tolerance * 0.25))
+                    eff_local_tolerance = max(2, int(local_tolerance * 0.25))
 
-                # 1. Global Check: Color family match
-                global_diff = np.max(np.abs(current_pixel - seed_color))
+                # 1. Global Check against our fixed white standard reference
+                global_diff = np.max(np.abs(current_pixel - bg_ref))
 
-                # 2. Local Check: Edge detection transition
+                # 2. Local Check against neighbor to step around sharp edge contours
                 local_diff = np.max(np.abs(current_pixel - parent_pixel))
 
                 if global_diff <= eff_tolerance and local_diff <= eff_local_tolerance:
                     visited[nr, nc] = True
                     is_bg[nr, nc]   = True
-                    queue.append((nr, nc, seed_color))
+                    queue.append((nr, nc))
 
     return is_bg
 
