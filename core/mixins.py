@@ -102,7 +102,7 @@ class QuotaMixin:
         today = timezone.now().date()
         return ConversionJob.objects.filter(
             user=user,
-            is_downloaded=True,  # Changed from status=JOB_STATUS_DONE
+            watermarked=True,  # Changed from status=JOB_STATUS_DONE
             created_at__date=today,
         ).count()
 
