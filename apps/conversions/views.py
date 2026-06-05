@@ -121,10 +121,7 @@ class UploadView(LoginRequiredMixin, PageTitleMixin, QuotaMixin, FormView):
         """
         Inspects incoming data logs while staying fully protected behind LoginRequiredMixin.
         """
-        print("\n" + "=" * 60)
-        print(" 🔍 RAW INBOUND FRONTEND PAYLOAD INSPECTOR 🔍 ")
-        print("=" * 60)
-        print("📥 POST Parameters:")
+       
         for key, value in request.POST.items():
             if key == "custom_zones" and value:
                 preview = value[:150] + "..." if len(value) > 150 else value
@@ -132,11 +129,7 @@ class UploadView(LoginRequiredMixin, PageTitleMixin, QuotaMixin, FormView):
             else:
                 print(f"  🔹 {key}: {value}")
 
-        print("\n📂 FILES Parameters:")
-        for key, file_obj in request.FILES.items():
-            print(f"  📂 {key}: {file_obj.name} ({file_obj.size} bytes | content_type={file_obj.content_type})")
-        print("=" * 60 + "\n")
-
+      
         logger.debug(
             "Frontend upload stream caught for authenticated user=%s. POST keys: %s | FILES keys: %s",
             request.user.email,
@@ -151,11 +144,8 @@ class UploadView(LoginRequiredMixin, PageTitleMixin, QuotaMixin, FormView):
         file_one = cleaned_data["file_one"]
         file_two = cleaned_data["file_two"]
         custom_zones = cleaned_data.get("custom_zones")
-
         user = self.request.user
-        watermark = self._should_watermark(user)
 
-        # 1. Initialize the conversion job record bound safely to the current user
         job = ConversionJob.objects.create(
             user=user,
             approach=approach,
@@ -164,7 +154,6 @@ class UploadView(LoginRequiredMixin, PageTitleMixin, QuotaMixin, FormView):
             input_filename_two=file_two.name if file_two else "n/a",
             input_bytes_two=read_uploaded_file(file_two) if file_two else b"",
         )
-
         job.mark_processing()
 
         # 2. Scale custom coordinates from relative fractions to absolute pixels
@@ -200,19 +189,19 @@ class UploadView(LoginRequiredMixin, PageTitleMixin, QuotaMixin, FormView):
         try:
             logger.info("UploadView: starting conversion engine for job=%s", job.id)
 
+            # CRITICAL: Always generate and save a CLEAN baseline image to the database
             output = convert_bytes(
                 file_bytes_one=bytes(job.input_bytes_one),
                 filename_one=job.input_filename_one,
                 file_bytes_two=bytes(job.input_bytes_two),
                 filename_two=job.input_filename_two,
                 approach=job.approach,
-                watermark=watermark,
+                watermark=False,  # <-- Forced to False
                 custom_zones=custom_zones,
             )
 
-            job.mark_done(output_bytes=output, watermarked=watermark)
+            job.mark_done(output_bytes=output, watermarked=False)
             
-            # 4. Prime the cache layer with asset slices for instant adjustments
             try:
                 slices = extract_slices(
                     file_bytes_one=bytes(job.input_bytes_one),
@@ -222,24 +211,21 @@ class UploadView(LoginRequiredMixin, PageTitleMixin, QuotaMixin, FormView):
                     custom_zones=custom_zones,
                 )
                 cache_slices(job.id, slices)
-                logger.info("UploadView: Successfully primed asset slices cache for job=%s", job.id)
             except Exception as cache_err:
                 logger.warning("UploadView: Asset slicing caching failed: %s", cache_err)
                 
-            logger.info("UploadView: success job=%s", job.id)
             return redirect(reverse("conversions:result", kwargs={"pk": job.id}))
 
         except (ConversionFailedError, UnsupportedFileTypeError) as exc:
             job.mark_failed(str(exc))
             messages.error(self.request, str(exc))
             return self._render_invalid_fallback(form, reason="engine_expected_failure")
-
         except Exception as exc:
             job.mark_failed("System error during processing.")
-            logger.exception("UploadView: crash job=%s | custom_zones_payload=%s", job.id, custom_zones)
             messages.error(self.request, "An internal error occurred. Please try again.")
             return self._render_invalid_fallback(form, reason="engine_unexpected_crash")
-
+        
+        
     def form_invalid(self, form):
         logger.error("UploadView: Form Validation Failed | Errors: %s", form.errors.as_data())
         messages.error(self.request, "Please check your file selection and try again.")
@@ -291,16 +277,12 @@ class ResultView(LoginRequiredMixin, OwnerRequiredMixin, PageTitleMixin, DetailV
 
 
 # ─── Download View ────────────────────────────────────────────────────────────
-
 class DownloadView(LoginRequiredMixin, View):
-    """
-    Streams output JPEG arrays and clears heavy file system blobs right after execution.
-    """
+    """ Streams final files. Strips watermark for paid accounts on checkout. """
     def get(self, request, *args, **kwargs):
         pk = self.kwargs.get("pk")
         job = get_object_or_404(ConversionJob, pk=pk)
 
-        # Explicit Object Ownership Check
         if job.user != request.user:
             raise Http404("Job not found.")
 
@@ -309,17 +291,20 @@ class DownloadView(LoginRequiredMixin, View):
             return redirect("conversions:upload")
 
         filename = build_output_filename(str(job.id))
-        
-        # --- WATERMARK EXECUTION LAYER ---
         content_bytes = bytes(job.output_bytes)
+        
         try:
             is_free_trial = request.user.conversion_quota.conversions_allowed == FREE_DAILY_LIMIT
         except Exception:
             is_free_trial = True
 
+        # --- WATERMARK RULE ENFORCEMENT ---
         if is_free_trial:
+            # Free trials retain watermarks on download
             content_bytes = apply_amharic_watermark(content_bytes)
-        # ---------------------------------
+        else:
+            # Paid users pull the clean, raw bytes directly from database storage
+            pass 
 
         response = file_download_response(
             content=content_bytes,
@@ -327,27 +312,21 @@ class DownloadView(LoginRequiredMixin, View):
             content_type="image/jpeg",
         )
 
-        # Broadcast download transaction to handle database adjustments atomically
+        # Triggers credit deduction and sets job.is_downloaded=True atomically
         job_downloaded.send(
             sender=self.__class__, 
             job=job, 
             user=request.user
         )
 
-        # Secure memory release sequence
+        # Secure clean up
         job.clear_output_bytes()
         job.clear_input_bytes()
 
-        logger.info("DownloadView: file downloaded and database cleared for job=%s", job.id)
         return response
-
-
 # ─── Image Preview View ───────────────────────────────────────────────────────
-
 class ImageView(LoginRequiredMixin, View):
-    """
-    Serves the binary rendering layer directly into HTML preview components safely.
-    """
+    """ Serves preview arrays. Both Paid and Free tiers see watermarks here. """
     def get(self, request, pk):
         job = get_object_or_404(ConversionJob, pk=pk)
 
@@ -357,19 +336,12 @@ class ImageView(LoginRequiredMixin, View):
         if not job.output_bytes:
             raise Http404("Image not available.")
 
-        # --- WATERMARK EXECUTION LAYER ---
-        output_bytes = bytes(job.output_bytes)
-        try:
-            is_free_trial = request.user.conversion_quota.conversions_allowed == FREE_DAILY_LIMIT
-        except Exception:
-            is_free_trial = True
-
-        if is_free_trial:
-            output_bytes = apply_amharic_watermark(output_bytes)
-        # ---------------------------------
+        # Unconditionally apply watermark on previews for everyone
+        output_bytes = apply_amharic_watermark(bytes(job.output_bytes))
 
         return HttpResponse(output_bytes, content_type="image/jpeg")
-
+    
+    
 
 # ─── Adjust View (Field Adjustment Studio) ────────────────────────────────────
 
@@ -448,24 +420,19 @@ class AdjustView(LoginRequiredMixin, View):
                 status=500,
             )
 
+        # Inside AdjustView.post() matching your commit logic block:
         if should_commit:
+            # Persistent saves remain clean
             job.output_bytes = new_output
             job.save(update_fields=["output_bytes"])
-            logger.info("AdjustView: persisted finalized coordinates for job=%s (%d bytes)", pk, len(new_output))
+            logger.info("AdjustView: persisted finalized coordinates for job=%s", pk)
             return JsonResponse({"ok": True})
         else:
-            # --- WATERMARK EXECUTION LAYER ---
-            try:
-                is_free_trial = request.user.conversion_quota.conversions_allowed == FREE_DAILY_LIMIT
-            except Exception:
-                is_free_trial = True
-
-            if is_free_trial:
-                new_output = apply_amharic_watermark(new_output)
-            # ---------------------------------
-            
-            return HttpResponse(new_output, content_type="image/jpeg")
-
+            # Live canvas interaction render: Force watermark preview for all accounts
+            watermarked_preview = apply_amharic_watermark(new_output)
+            return HttpResponse(watermarked_preview, content_type="image/jpeg")
+        
+        
     @staticmethod
     def _validate_output_zones(output_zones: dict) -> str | None:
         for side in ("front", "back"):

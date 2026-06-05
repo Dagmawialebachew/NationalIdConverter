@@ -93,15 +93,16 @@ class QuotaMixin:
         # Paid tier: check monthly count
         return quota.conversions_used >= quota.conversions_allowed
 
+    # ─── UPDATED QUOTA MIXIN METHOD IN core/mixins.py ────────────────────────────
+
     def _get_today_count(self, user) -> int:
-        """Count today's completed conversions for free-tier daily limit check."""
+        """Count today's physically downloaded conversions for free-tier checks."""
         from apps.conversions.models import ConversionJob
-        from core.constants import JOB_STATUS_DONE
 
         today = timezone.now().date()
         return ConversionJob.objects.filter(
             user=user,
-            status=JOB_STATUS_DONE,
+            is_downloaded=True,  # Changed from status=JOB_STATUS_DONE
             created_at__date=today,
         ).count()
 

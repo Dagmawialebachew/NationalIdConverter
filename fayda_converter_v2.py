@@ -22,8 +22,8 @@ _FW = _TW // 2  # 1180px per layout hemisphere (Front / Back)
 
 # ─── PIXEL-PERFECT TARGET CANVAS COORDINATES (2360x667 Base) ──────────────────
 FRONT_ZONES = {
-    "vertical_strip_left":  (85, 90, 195 , 285), 
-    "vertical_strip_right":  (85, 393, 193 , 543), # NEW: second strip on right side
+    "vertical_strip_left":  (85, 100, 195 , 283), 
+    "vertical_strip_right":  (85, 403, 193 , 541), # NEW: second strip on right side
     "photo_main":     (149, 145, 523, 599),
     "name_field": (513, 192, 1055, 282), # Slightly widened to prevent text crowding
     "dob_field":      (509, 260, 1117, 440),
@@ -34,7 +34,7 @@ FRONT_ZONES = {
 }
 
 BACK_ZONES = {
-    "phone_field":    (57, 42, 317, 167),
+    "phone_field":    (54, 47, 314, 177),
     "address_field":  (60, 185, 615, 605),  # Expanded bounding box for clean multi-line addresses
     "fin_value":      (165, 477, 380, 672), 
     "qr_area":        (512, 10, 918, 625),
@@ -42,30 +42,32 @@ BACK_ZONES = {
 }
 
 # ─── ADVANCED IMAGE PROCESSING UTILITIES ──────────────────────────────────────
-
-
+import io
 import numpy as np
-from PIL import Image, ImageFilter, ImageChops
- 
- 
+from PIL import Image, ImageFilter, ImageChops, ImageOps
+
+
 def remove_white_background(
     img: Image.Image,
     threshold: int = 24,          # Global tolerance from seed color
-    local_threshold: int = 10,    # 🔥 Edge guard: stops fill jumping over sharp lines
+    local_threshold: int = 10,    # Edge guard: stops fill jumping over sharp lines
     edge_shrink: int = 2,         
     feather_radius: int = 5,      
     legacy_threshold: int = 240,
+    mode: str = "transparent"     # Options: "transparent" (small photo) or "vignette" (main photo)
 ) -> Image.Image:
     """
     Remove the white/near-white background from an ID photo using edge-aware
     dual-constraint flood-fill seeding + morphological soft-alpha feathering.
+    
+    Set mode="transparent" for clear alpha cutouts (small photo frame).
+    Set mode="vignette" for studio gradient backdrop + depth shadow (main photo frame).
     """
     try:
-        return _remove_bg_numpy(img, threshold, local_threshold, edge_shrink, feather_radius)
+        return _remove_bg_numpy(img, threshold, local_threshold, edge_shrink, feather_radius, mode)
     except Exception as e:
         print(f"Fallback to legacy due to: {e}")
-        return _remove_bg_legacy(img, legacy_threshold)
-
+        return _remove_bg_legacy(img, legacy_threshold, mode)
 
 def _remove_bg_numpy(
     img: Image.Image,
@@ -80,13 +82,13 @@ def _remove_bg_numpy(
 
     arr = np.array(rgb, dtype=np.float32)
 
-    # ── Stage 1: Dual-Constraint Flood Fill ──────────────────────────────────
+    # ── Stage 1: Spatial-Aware Flood Fill ────────────────────────────────────
     bg_mask = _flood_fill_background(arr, threshold, local_threshold)
 
-    # ── Stage 2: Morphological Clean up ──────────────────────────────────────
+    # ── Stage 2: Morphological Cleaning & Processing ──────────────────────────
     bg_pil = Image.fromarray((bg_mask * 255).astype(np.uint8), mode="L")
 
-    # Erode the background mask inward to ensure high fidelity on hair borders
+    # Erode background mask inward to completely isolate hair lines
     for _ in range(edge_shrink):
         bg_pil = bg_pil.filter(ImageFilter.MinFilter(3))
 
@@ -94,26 +96,54 @@ def _remove_bg_numpy(
     for _ in range(feather_radius):
         feather_pil = feather_pil.filter(ImageFilter.MaxFilter(3))
 
-    # ── Stage 3: Smooth Edge Blend ───────────────────────────────────────────
-    blurred = feather_pil.filter(ImageFilter.GaussianBlur(radius=feather_radius * 0.5))
+    # ── Stage 3: Soft-Alpha Edge Calculation ──────────────────────────────────
+    blurred = feather_pil.filter(ImageFilter.GaussianBlur(radius=feather_radius * 0.4))
     alpha = ImageChops.invert(blurred)
 
     eroded_arr = np.array(bg_pil, dtype=np.float32) / 255.0
     alpha_arr  = np.array(alpha,  dtype=np.float32) / 255.0
 
-    # Enforce concrete absolute zones
-    alpha_arr[eroded_arr > 0.9] = 0.0   # Confirmed background
-    alpha_arr[eroded_arr < 0.01] = 1.0  # Confirmed internal subject
+    # Guarantee absolute zones for subject interior vs background exterior
+    alpha_arr[eroded_arr > 0.85] = 0.0   # Clear Background
+    alpha_arr[eroded_arr < 0.02] = 1.0   # Pure Subject Interior
 
     final_alpha = Image.fromarray((np.clip(alpha_arr, 0, 1) * 255).astype(np.uint8), mode="L")
-    rgba.putalpha(final_alpha)
-    return rgba
-
+    
+    # ── Stage 4: Authentic White Elliptical Aura Backing Generation ──────────
+    # Generates a soft vertical elliptical white vignette that transitions smoothly
+    # to complete transparency at its outer boundary to reveal the template pattern.
+    y, x = np.ogrid[:h, :w]
+    center_x, center_y = w / 2.0, h * 0.48  # Locks positioning right behind head & torso
+    
+    # Define accurate proportional aspect-locked radii for the vertical oval glow
+    rx, ry = w * 0.48, h * 0.52
+    ellipse_dist = np.sqrt(((x - center_x) / rx)**2 + ((y - center_y) / ry)**2)
+    
+    # Smoothstep mathematical falloff curve (3t² - 2t³) to prevent harsh edges
+    vignette = np.clip((ellipse_dist - 0.15) / 0.75, 0, 1)
+    vignette_smooth = 3 * vignette**2 - 2 * vignette**3
+    bg_alpha_arr = ((1.0 - vignette_smooth) * 255).astype(np.uint8)
+    
+    # Construct the pure white background aura with the soft elliptical alpha channel
+    white_aura = Image.new("RGBA", (w, h), (255, 255, 255, 255))
+    white_aura.putalpha(Image.fromarray(bg_alpha_arr, mode="L"))
+    
+    # ── Stage 5: Alpha Composition Stack Synthesis ───────────────────────────
+    # Isolate the subject into a clean independent layer using its soft-feathered alpha
+    subject_layer = rgba.copy()
+    subject_layer.putalpha(final_alpha)
+    
+    # Superimpose the cutout subject directly onto the soft white aura layer
+    final_composite = Image.alpha_composite(white_aura, subject_layer)
+    
+    # CRITICAL: Return as RGBA so the outer transparency masks blend with the template canvas
+    return final_composite
 
 def _flood_fill_background(arr: np.ndarray, tolerance: int, local_tolerance: int) -> np.ndarray:
     """
     Executes a BFS flood-fill guarded by both a global color constraint 
     and a local neighborhood edge constraint to prevent highlight bleed.
+    Utilizes localized threshold coordinates to preserve white clothes and dresses.
     """
     h, w = arr.shape[:2]
     visited = np.zeros((h, w), dtype=bool)
@@ -122,13 +152,12 @@ def _flood_fill_background(arr: np.ndarray, tolerance: int, local_tolerance: int
     from collections import deque
     queue = deque()
 
-    # Seed positions across the four outer corners of the image boundary
-    corners = [(0, 0), (0, w - 1), (h - 1, 0), (h - 1, w - 1)]
-    for r, c in corners:
+    # Seed positions safely over top row boundaries to protect torso/shirts at the bottom
+    top_seeds = [(0, int(c)) for c in np.linspace(0, w - 1, 9)]
+    for r, c in top_seeds:
         if not visited[r, c]:
             visited[r, c] = True
             is_bg[r, c]   = True
-            # Store row, col, and the initial color reference of that specific path
             queue.append((r, c, arr[r, c]))
 
     # Execution Loop
@@ -140,22 +169,40 @@ def _flood_fill_background(arr: np.ndarray, tolerance: int, local_tolerance: int
                 current_pixel = arr[nr, nc]
                 parent_pixel  = arr[cr, cc]
 
+                # ── SPATIAL PROTECTION MATRIX ──
+                eff_tolerance = tolerance
+                eff_local_tolerance = local_tolerance
+
+                # Lower canvas constraint clamping (Protects white shirts/ties/dresses)
+                if nr > int(h * 0.40):
+                    eff_tolerance = max(5, int(tolerance * 0.40))
+                    eff_local_tolerance = max(2, int(local_tolerance * 0.40))
+                    
+                    if int(w * 0.20) < nc < int(w * 0.80):
+                        eff_tolerance = max(2, int(tolerance * 0.15))
+                        eff_local_tolerance = max(1, int(local_tolerance * 0.15))
+                
+                # Upper-middle canvas boundary protection (Protects face skin highlights)
+                elif int(h * 0.18) < nr <= int(h * 0.40) and int(w * 0.25) < nc < int(w * 0.75):
+                    eff_tolerance = max(7, int(tolerance * 0.55))
+                    eff_local_tolerance = max(3, int(local_tolerance * 0.55))
+
                 # 1. Global Check: Is the pixel close to the source background color family?
                 global_diff = np.max(np.abs(current_pixel - seed_color))
 
                 # 2. Local Check: Is the step transition smooth, or did we hit an edge?
                 local_diff = np.max(np.abs(current_pixel - parent_pixel))
 
-                if global_diff <= tolerance and local_diff <= local_tolerance:
+                if global_diff <= eff_tolerance and local_diff <= eff_local_tolerance:
                     visited[nr, nc] = True
                     is_bg[nr, nc]   = True
                     queue.append((nr, nc, seed_color))
 
     return is_bg
-# ─── Legacy fallback (no numpy) ───────────────────────────────────────────────
- 
-def _remove_bg_legacy(img: Image.Image, threshold: int = 240) -> Image.Image:
-    """Original single-pass threshold — used only if numpy is unavailable."""
+
+
+def _remove_bg_legacy(img: Image.Image, threshold: int = 240, mode: str = "transparent") -> Image.Image:
+    """Original single-pass threshold fallback layer."""
     rgba = img.convert("RGBA")
     data = rgba.getdata()
     new_data = []
@@ -165,7 +212,13 @@ def _remove_bg_legacy(img: Image.Image, threshold: int = 240) -> Image.Image:
         else:
             new_data.append(item)
     rgba.putdata(new_data)
-    return rgba
+    
+    if mode == "transparent":
+        return rgba
+        
+    white_bg = Image.new("RGBA", img.size, (255, 255, 255, 255))
+    return Image.alpha_composite(white_bg, rgba)
+
 
 
 def _load_image(file_bytes: bytes, filename: str) -> Image.Image:
@@ -233,7 +286,8 @@ def _composite_element(
     rotate_deg: int = 0,
     strip_white: bool = False,
     stretch: bool = False,
-    scale: float = 1.0
+    scale: float = 1.0,
+    is_main_photo: bool = False  # Added condition parameter for main photo styling
 ) -> None:
     """
     Pastes assets while maintaining aspect ratios. Supports background stripping
@@ -257,38 +311,50 @@ def _composite_element(
     ew, eh = elem_copy.size
 
     if stretch:
-
-        # FORCE EXACT FIT
         new_w = zw
         new_h = zh
-
         px = x1
         py = y1
-
     else:
-
-        # PRESERVE ASPECT RATIO
         ratio = min(zw / ew, zh / eh)
-
         new_w = int(ew * ratio * scale)
         new_h = int(eh * ratio * scale)
-
-        px = x1
+        px = x1 + (zw - new_w) // 2
         py = y1 + (zh - new_h) // 2
 
-    elem_copy = elem_copy.resize(
-        (new_w, new_h),
-        Image.Resampling.LANCZOS
-    )
+    elem_copy = elem_copy.resize((new_w, new_h), Image.Resampling.LANCZOS)
     if apply_sharpen:
         elem_copy = elem_copy.filter(ImageFilter.SHARPEN)
         
-    
     # 5. Composition Execution Matrix
     if elem_copy.mode == "RGBA":
-        canvas.paste(elem_copy, (px, py), mask=elem_copy)  # Use copy as its own alpha mask
+        if is_main_photo:
+            # 🅰️ Generate a clean studio white background with a soft edge vignette
+            y, x = np.ogrid[:new_h, :new_w]
+            cx, cy = new_w / 2.0, new_h * 0.38  # Center point behind the head
+            dist = np.sqrt((x - cx)**2 + (y - cy)**2)
+            max_dist = np.sqrt(cx**2 + (new_h - cy)**2)
+            norm_dist = dist / max_dist if max_dist > 0 else dist
+            
+            # Light halo effect: Center stays pure white (255), outer corners fade smoothly to soft studio gray (232)
+            vig_arr = 255 - (norm_dist * 23)
+            vig_arr = np.clip(vig_arr, 232, 255).astype(np.uint8)
+            vig_img = Image.fromarray(vig_arr, mode="L")
+            photo_bg = Image.merge("RGBA", (vig_img, vig_img, vig_img, Image.new("L", (new_w, new_h), 255)))
+            
+            # 🅱️ Generate a smooth, professional drop shadow behind the subject cutout
+            alpha = elem_copy.split()[3]
+            shadow_mask = alpha.filter(ImageFilter.GaussianBlur(radius=max(3, int(new_w * 0.018))))
+            shadow_layer = Image.new("RGBA", (new_w, new_h), (50, 52, 60, 65)) # Smooth cool gray shadow
+            
+            # Composite the photo assembly layer: Background -> Drop Shadow -> Cutout Subject
+            bg_with_shadow = Image.composite(shadow_layer, photo_bg, shadow_mask)
+            elem_copy = Image.composite(elem_copy, bg_with_shadow, alpha)
+
+        canvas.paste(elem_copy, (px, py), mask=elem_copy.split()[3] if is_main_photo else elem_copy)
     else:
         canvas.paste(elem_copy, (px, py))
+        
         
 from PIL import Image, ImageFilter, ImageOps, ImageStat, ImageEnhance
 
@@ -508,94 +574,129 @@ def _resolve_output_zones(output_zones: dict):
 # ==============================================================================
 
 
-# Insert directly below BACK_ZONES definition
-import io
-from PIL import Image, ImageDraw, ImageFont
+from django.conf import settings
+
+
+logger = logging.getLogger(__name__)
 
 def apply_amharic_watermark(image_bytes: bytes) -> bytes:
     """
-    Applies a semi-transparent, diagonally rotated Amharic & English watermark.
-    Operates strictly in memory via bytes for maximum low-latency processing.
+    Applies a highly noticeable, dynamically scaled, double-diagonal parallel
+    watermark (Amharic & English) across both layout hemispheres, ensuring
+    comprehensive coverage and a top-layer z-index over all card objects (including the QR code).
     """
     img = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
     W, H = img.size
     
-    # Create an independent transparent layer for compiling our watermarks
+    # Create an independent transparent layer for the watermark overlay
     watermark_layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
     
-    # Pre-calculated safe system font paths
-    font_paths = ["Nyala.ttf", "AbyssinicaSIL-R.ttf", "AbyssinicaSIL.ttf", "arialbd.ttf", "FreeSansBold.ttf"]
+    # ─── BULLETPROOF FONT PATH LOOKUP MATRIX ─────────────────────────────────
+    try:
+        root_dir = Path(settings.BASE_DIR)
+    except Exception:
+        root_dir = Path(__file__).resolve().parent.parent.parent
+
+    font_candidates = [
+        root_dir / "fonts" / "watermark-font.ttf",
+        root_dir / "static" / "fonts" / "watermark-font.ttf",
+        Path(__file__).resolve().parent / "fonts" / "watermark-font.ttf",
+        Path(__file__).resolve().parent / "watermark-font.ttf",
+    ]
+
     font = None
-    font_size = 65  # Increased slightly from 55 to maximize visual distinction
     
-    for path in font_paths:
-        try:
-            font = ImageFont.truetype(path, font_size)
-            break
-        except Exception:
-            continue
-            
-    if not font:
-        font = ImageFont.load_default()
-        
-    is_default = (font.__class__.__name__ == 'ImageDefaultFont')
+    # ─── OPTIMIZED DYNAMIC SIZING ENGINE ─────────────────────────────────────
+    # Font sizes scaled to keep the dual layout highly legible without overcrowding
+    FONT_SIZE = max(38, int(H * 0.058))     
+    stamp_size = max(500, int(H * 0.65))    # Safe text rotation bounding square
     
-    text_amharic = "ናሙና"
-    text_english = "PREVIEW ONLY"
-    if is_default:
-        text_amharic = "SAMPLE PROOF"  # Clean fallback string if system font lacks Amharic character maps
-        
-    # ─── AESTHETIC CONTROLS ───────────────────────────────────────────────────
-    ANGLE = 35        # Counter-clockwise rotation angle (degrees)
-    OPACITY = 42      # Text opacity level (0 = completely transparent, 255 = fully opaque)
-    COLOR_HEX = (20, 24, 33, OPACITY) # Premium deep charcoal theme
+    for path in font_candidates:
+        if path.exists():
+            try:
+                font = ImageFont.truetype(str(path), FONT_SIZE)
+                logger.info("--> Successfully bound watermark font: %s (Size: %dpx)", path, FONT_SIZE)
+                break
+            except Exception as e:
+                logger.warning("--> Found font file at %s but failed to parse: %s", path, e)
+                continue
+
+    is_default = (font is None or font.__class__.__name__ == 'ImageDefaultFont')
     
-    # ─── GENERATE ROTATED WATERMARK STAMP ─────────────────────────────────────
-    # We use a standalone square canvas to hold and rotate the text cleanly without edge clips
-    stamp_size = 600
+    # ─── HIGH-VISIBILITY DESIGN CONTROLS ─────────────────────────────────────
+    ANGLE = 35        # Premium diagonal slash angle
+    OPACITY = 140     # High-visibility preview opacity
+    
+    TEXT_AMHARIC = "ሳምፕል"
+    TEXT_ENGLISH = "PREVIEW ONLY"
+    
+    # Elegant dark slate charcoal fill color
+    COLOR_RGBA = (40, 45, 55, OPACITY) 
+    # Bright crisp backing stroke outline to pop text out on dark card items
+    STROKE_RGBA = (255, 255, 255, int(OPACITY * 0.8))
+    STROKE_WIDTH = max(1, int(FONT_SIZE * 0.035)) # Proportional stroke width
+    
+    # ─── GENERATE WATERMARK STAMP ─────────────────────────────────────────────
     stamp = Image.new("RGBA", (stamp_size, stamp_size), (0, 0, 0, 0))
     stamp_draw = ImageDraw.Draw(stamp)
     
-    # Calculate geometric sizing boundaries for precise layout centering
-    if hasattr(font, 'getbbox'):
-        bx1, by1, bx2, by2 = font.getbbox(text_amharic)
-        w1, h1 = bx2 - bx1, by2 - by1
-        bx1, by1, bx2, by2 = font.getbbox(text_english)
-        w2, h2 = bx2 - bx1, by2 - by1
+    if is_default:
+        logger.error("Watermark TTF font not found. Activating system fallback canvas.")
+        fallback_text = "--- PREVIEW ONLY / ናሙና ---"
+        stamp_draw.text((40, stamp_size // 2 - 10), fallback_text, fill=COLOR_RGBA)
     else:
-        # Backward compatibility fallback for legacy versions
-        w1, h1 = stamp_draw.textsize(text_amharic, font=font) if hasattr(stamp_draw, 'textsize') else (160, 45)
-        w2, h2 = stamp_draw.textsize(text_english, font=font) if hasattr(stamp_draw, 'textsize') else (260, 45)
-
-    # Render lines stacked and centered on our temporary stamp canvas
-    x1 = (stamp_size - w1) // 2
-    y1 = (stamp_size // 2) - h1 - 12  # Amharic line positioned above middle axis
-    stamp_draw.text((x1, y1), text_amharic, fill=COLOR_HEX, font=font)
-    
-    x2 = (stamp_size - w2) // 2
-    y2 = (stamp_size // 2) + 12       # English line positioned below middle axis
-    stamp_draw.text((x2, y2), text_english, fill=COLOR_HEX, font=font)
-    
-    # Apply crisp diagonal rotation layer transform
-    rotated_stamp = stamp.rotate(ANGLE, resample=Image.BICUBIC)
-    
-    # ─── POSITION STAMP ON MAIN CANVAS HEMISPHERES ────────────────────────────
-    # Exact center focal points for Front (590px) and Back (1770px) layout halves
-    centers = [590, 1770]
-    for cx in centers:
-        # Offset positioning vectors so stamp centers sit precisely over target targets
-        paste_x = cx - (stamp_size // 2)
-        paste_y = (H // 2) - (stamp_size // 2)
-        watermark_layer.paste(rotated_stamp, (paste_x, paste_y), rotated_stamp)
+        # ─── TRUE-TYPE DUAL TEXT COMPOSITING ───
+        if hasattr(font, 'getbbox'):
+            bx1, by1, bx2, by2 = font.getbbox(TEXT_AMHARIC)
+            w1, h1 = bx2 - bx1, by2 - by1
+            
+            bx1, by1, bx2, by2 = font.getbbox(TEXT_ENGLISH)
+            w2, h2 = bx2 - bx1, by2 - by1
+        else:
+            w1, h1 = stamp_draw.textsize(TEXT_AMHARIC, font=font) if hasattr(stamp_draw, 'textsize') else (int(stamp_size*0.4), FONT_SIZE)
+            w2, h2 = stamp_draw.textsize(TEXT_ENGLISH, font=font) if hasattr(stamp_draw, 'textsize') else (int(stamp_size*0.7), FONT_SIZE)
+            
+        # Stack text layers centered relative to the stamp's middle axis
+        x1 = (stamp_size - w1) // 2
+        y1 = (stamp_size // 2) - h1 - int(FONT_SIZE * 0.25)
+        stamp_draw.text(
+            (x1, y1), TEXT_AMHARIC, fill=COLOR_RGBA, font=font,
+            stroke_width=STROKE_WIDTH, stroke_fill=STROKE_RGBA
+        )
         
-    # Merge transparent layers back together and compile optimized output
+        x2 = (stamp_size - w2) // 2
+        y2 = (stamp_size // 2) + int(FONT_SIZE * 0.25)
+        stamp_draw.text(
+            (x2, y2), TEXT_ENGLISH, fill=COLOR_RGBA, font=font,
+            stroke_width=STROKE_WIDTH, stroke_fill=STROKE_RGBA
+        )
+        
+    # Apply clean rotation transform with an explicit transparent fill color fallback
+    rotated_stamp = stamp.rotate(ANGLE, resample=Image.BICUBIC, fillcolor=(0, 0, 0, 0))
+    
+    # ─── POSITION DOUBLE STAMP ON MAIN CANVAS HEMISPHERES ────────────────────
+    # Maps precisely to both card layout centers (Front: W//4, Back: 3*W//4)
+    centers = [W // 4, (3 * W) // 4]
+    
+    # Stagger offsets relative to the focal point to render a parallel double watermark track.
+    # The lower-right offset track ensures complete diagonal covering directly over the QR code area.
+    double_offsets = [
+        (-int(W * 0.04), -int(H * 0.12)),  # Track 1: Upper-Left Stagger
+        (int(W * 0.04), int(H * 0.12))     # Track 2: Lower-Right Stagger (Overlaps QR Zone)
+    ]
+    
+    for cx in centers:
+        for dx, dy in double_offsets:
+            paste_x = cx + dx - (stamp_size // 2)
+            paste_y = (H // 2) + dy - (stamp_size // 2)
+            watermark_layer.paste(rotated_stamp, (paste_x, paste_y), rotated_stamp)
+        
+    # Compile multi-layer alpha composition over the final canvas
     composite = Image.alpha_composite(img, watermark_layer).convert("RGB")
     output_buffer = io.BytesIO()
     composite.save(output_buffer, format="JPEG", quality=95, optimize=True)
     
     return output_buffer.getvalue()
-
-
 
 def extract_slices(
     file_bytes_one: bytes, filename_one: str,
@@ -718,8 +819,8 @@ def render_layout_from_slices(
     canvas = Image.open(TEMPLATE_PATH).convert("RGB")
 
     # 1. Inject Left Hemisphere Elements (Front Side Layout)
-    _composite_element(canvas, slices["biometric_photo"], _front_zones["photo_main"], 0, apply_sharpen=True, strip_white=True)    
-    _composite_element(canvas, slices["biometric_photo"], _front_zones["photo_small"], 0, strip_white=True)
+    _composite_element(canvas, slices["biometric_photo"], _front_zones["photo_main"], 0, apply_sharpen=True, strip_white=True, is_main_photo=False)    
+    _composite_element(canvas, slices["biometric_photo"], _front_zones["photo_small"], 0, strip_white=True, is_main_photo=False)
     _composite_element(canvas, slices["barcode_seg"], _front_zones["barcode_area"], 0, stretch=True)
     _composite_text_stencil(canvas, slices["vertical_seg_1"], _front_zones["vertical_strip_left"], 0)
     _composite_text_stencil(canvas, slices["vertical_seg_2"], _front_zones["vertical_strip_right"], 0)
