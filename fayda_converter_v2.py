@@ -37,7 +37,7 @@ BACK_ZONES = {
     "phone_field":    (54, 47, 314, 177),
     "address_field":  (60, 185, 615, 605),  # Expanded bounding box for clean multi-line addresses
     "fin_value":      (165, 477, 380, 672), 
-    "qr_area":        (512, 10, 918, 625),
+    "qr_area":        (558, 7, 964, 640),
     "sn_field":       (885, 612, 1160, 652),
 }
 
@@ -103,20 +103,42 @@ def remove_white_background(
     except Exception as e:
         print(f"Fallback to legacy due to: {e}")
         return _remove_bg_legacy(img, legacy_threshold, mode)
+
 def _remove_bg_numpy(
     img: Image.Image,
     threshold: int,
     local_threshold: int,
     edge_shrink: int,
     feather_radius: int,
+    mode: str = "transparent"  # Param restored and handled correctly
 ) -> Image.Image:
     rgba = img.convert("RGBA")
     rgb  = img.convert("RGB")
     w, h = rgb.size
 
+    # 1. Run your edge-aware BFS flood fill
     bg_mask = _flood_fill_background(np.array(rgb, dtype=np.float32), threshold, local_threshold)
     bg_pil = Image.fromarray((bg_mask * 255).astype(np.uint8), mode="L")
 
+    # 2. Face Shield Protection Box
+    # Protects the central facial region from accidental flood leakages
+    protection_shield = Image.new("L", (w, h), 255) # Start fully transparent to background removal
+    draw = ImageDraw.Draw(protection_shield)
+    
+    # Define face container boundaries (Left, Top, Right, Bottom)
+    pad_w = int(w * 0.22)  # Shields central 56% width (keeps hair/ears clear)
+    pad_h = int(h * 0.18)  # Shields forehead down to chest profile
+    
+    # Draw a solid black box (0 means: "Do NOT strip background here under any circumstance")
+    draw.rectangle([pad_w, pad_h, w - pad_w, h - pad_h], fill=0)
+    
+    # Soften the transition boundary to prevent hard, sharp box edges on hair/shoulders
+    protection_shield = protection_shield.filter(ImageFilter.GaussianBlur(radius=4))
+    
+    # Intersect the masks: Background is only wiped where BOTH algorithms agree it is background
+    bg_pil = ImageChops.multiply(bg_pil, protection_shield)
+
+    # 3. Morphological Soft-Alpha Feathering Pipeline
     for _ in range(edge_shrink):
         bg_pil = bg_pil.filter(ImageFilter.MinFilter(3))
 
@@ -127,7 +149,7 @@ def _remove_bg_numpy(
     blurred = feather_pil.filter(ImageFilter.GaussianBlur(radius=feather_radius * 0.4))
     alpha = ImageChops.invert(blurred)
     
-    # Isolate subject
+    # Isolate subject canvas
     subject_layer = rgba.copy()
     subject_layer.putalpha(alpha)
     return subject_layer
@@ -137,7 +159,6 @@ def _flood_fill_background(arr: np.ndarray, tolerance: int, local_tolerance: int
     """
     Executes a BFS flood-fill guarded by both a global color constraint 
     and a local neighborhood edge constraint to prevent highlight bleed.
-    Utilizes localized threshold coordinates to preserve white clothes and dresses.
     """
     h, w = arr.shape[:2]
     visited = np.zeros((h, w), dtype=bool)
@@ -146,7 +167,7 @@ def _flood_fill_background(arr: np.ndarray, tolerance: int, local_tolerance: int
     from collections import deque
     queue = deque()
 
-    # Seed positions safely over top row boundaries to protect torso/shirts at the bottom
+    # Seed positions across the top row to ensure clean entry
     top_seeds = [(0, int(c)) for c in np.linspace(0, w - 1, 9)]
     for r, c in top_seeds:
         if not visited[r, c]:
@@ -176,15 +197,15 @@ def _flood_fill_background(arr: np.ndarray, tolerance: int, local_tolerance: int
                         eff_tolerance = max(2, int(tolerance * 0.15))
                         eff_local_tolerance = max(1, int(local_tolerance * 0.15))
                 
-                # Upper-middle canvas boundary protection (Protects face skin highlights)
+                # Upper-middle canvas boundary (Slightly relaxed since protection_shield covers the core face)
                 elif int(h * 0.18) < nr <= int(h * 0.40) and int(w * 0.25) < nc < int(w * 0.75):
-                    eff_tolerance = max(7, int(tolerance * 0.55))
-                    eff_local_tolerance = max(3, int(local_tolerance * 0.55))
+                    eff_tolerance = max(9, int(tolerance * 0.65))
+                    eff_local_tolerance = max(4, int(local_tolerance * 0.65))
 
-                # 1. Global Check: Is the pixel close to the source background color family?
+                # 1. Global Check: Color family match
                 global_diff = np.max(np.abs(current_pixel - seed_color))
 
-                # 2. Local Check: Is the step transition smooth, or did we hit an edge?
+                # 2. Local Check: Edge detection transition
                 local_diff = np.max(np.abs(current_pixel - parent_pixel))
 
                 if global_diff <= eff_tolerance and local_diff <= eff_local_tolerance:
@@ -193,7 +214,6 @@ def _flood_fill_background(arr: np.ndarray, tolerance: int, local_tolerance: int
                     queue.append((nr, nc, seed_color))
 
     return is_bg
-
 
 def _remove_bg_legacy(img: Image.Image, threshold: int = 240, mode: str = "transparent") -> Image.Image:
     """Original single-pass threshold fallback layer."""
@@ -482,11 +502,12 @@ def _draw_generated_text(
 
     # 1. Resolve the path to the assets folder inside your repository dynamically
     current_dir = Path(__file__).parent
-    font_path = current_dir / "assets" / "arialbd.ttf"
+    font_path = current_dir / "fonts" / "ARIALBD.TTF"
 
     try:
         # 2. Try loading the bundled repository font first
         font = ImageFont.truetype(str(font_path), font_size)
+        print('--> Successfully loaded bundled font for text rendering.')
     except IOError:
         try:
             # 3. Local fallback (if you run it locally before moving the file)
@@ -815,7 +836,7 @@ def render_layout_from_slices(
     _composite_text_stencil(canvas, slices["expiry_seg"], _front_zones["expiry_field"], 0)
 
     # 4. Inject Right Hemisphere Elements (Back Side Layout Shifted via _FW Offset)
-    _composite_element(canvas, slices["qr_code_seg"], _back_zones["qr_area"], _FW, scale=1.32)
+    _composite_element(canvas, slices["qr_code_seg"], _back_zones["qr_area"], _FW, scale=1.25)
     _composite_text_stencil(canvas, slices["phone_seg"], _back_zones["phone_field"], _FW, zoom_x=1.30, zoom_y=1.30)
     _composite_text_stencil(canvas, slices["addr_seg"], _back_zones["address_field"], _FW, zoom_x=1.3, zoom_y=1.3, stretch_x=1.30)  
     _composite_text_stencil(canvas, slices["fin_value_seg"], _back_zones["fin_value"], _FW)
