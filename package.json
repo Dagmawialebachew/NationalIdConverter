@@ -4,12 +4,17 @@
   "description": "Django School Management System",
   "scripts": {
     "dev": "tailwindcss -i static/css/input.css -o static/css/output.css --watch"
-
   },
   "devDependencies": {
+    "cz-conventional-changelog": "^3.3.0",
     "tailwindcss": "^3.4.0"
   },
   "dependencies": {
     "chart.js": "^4.5.0"
+  },
+  "config": {
+    "commitizen": {
+      "path": "./node_modules/cz-conventional-changelog"
+    }
   }
 }

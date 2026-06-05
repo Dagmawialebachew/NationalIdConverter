@@ -465,7 +465,6 @@ def _sample_ink_color(
     return (20, 24, 33)  # Pristine government-grade charcoal tone
 
 from PIL import ImageFont
-
 def _draw_generated_text(
     canvas: Image.Image,
     text: str,
@@ -481,10 +480,20 @@ def _draw_generated_text(
 
     draw = ImageDraw.Draw(canvas)
 
+    # 1. Resolve the path to the assets folder inside your repository dynamically
+    current_dir = Path(__file__).parent
+    font_path = current_dir / "assets" / "arialbd.ttf"
+
     try:
-        font = ImageFont.truetype("arialbd.ttf", font_size)
-    except:
-        font = ImageFont.load_default()
+        # 2. Try loading the bundled repository font first
+        font = ImageFont.truetype(str(font_path), font_size)
+    except IOError:
+        try:
+            # 3. Local fallback (if you run it locally before moving the file)
+            font = ImageFont.truetype("arialbd.ttf", font_size)
+        except:
+            # 4. Emergency server fallback (will be small, but won't crash)
+            font = ImageFont.load_default()
 
     draw.text(
         (x1, y1),
@@ -492,7 +501,6 @@ def _draw_generated_text(
         fill=(20, 24, 33),
         font=font
     )
-
 
     
 # ─── MAIN TRANSACTION ENTRYPOINT ──────────────────────────────────────────────
