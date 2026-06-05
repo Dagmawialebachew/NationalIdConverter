@@ -47,6 +47,41 @@ import numpy as np
 from PIL import Image, ImageFilter, ImageChops, ImageOps
 
 
+from PIL import Image, ImageDraw, ImageFilter
+
+def _get_oval_background(size):
+    w, h = size
+
+    bg = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+
+    mask = Image.new("L", (w, h), 0)
+    draw = ImageDraw.Draw(mask)
+
+    padding_x = int(w * 0.02)
+    padding_y = int(h * 0.01)
+
+    draw.ellipse(
+        [
+            padding_x,
+            padding_y,
+            w - padding_x,
+            h - padding_y,
+        ],
+        fill=255
+    )
+
+    # Very subtle feathering only
+    mask = mask.filter(
+        ImageFilter.GaussianBlur(radius=3)
+    )
+
+    white = Image.new("RGBA", (w, h), (255, 255, 255, 255))
+
+    bg.paste(white, (0, 0), mask)
+
+    return bg
+
+
 def remove_white_background(
     img: Image.Image,
     threshold: int = 24,          # Global tolerance from seed color
@@ -68,7 +103,6 @@ def remove_white_background(
     except Exception as e:
         print(f"Fallback to legacy due to: {e}")
         return _remove_bg_legacy(img, legacy_threshold, mode)
-
 def _remove_bg_numpy(
     img: Image.Image,
     threshold: int,
@@ -80,15 +114,9 @@ def _remove_bg_numpy(
     rgb  = img.convert("RGB")
     w, h = rgb.size
 
-    arr = np.array(rgb, dtype=np.float32)
-
-    # ── Stage 1: Spatial-Aware Flood Fill ────────────────────────────────────
-    bg_mask = _flood_fill_background(arr, threshold, local_threshold)
-
-    # ── Stage 2: Morphological Cleaning & Processing ──────────────────────────
+    bg_mask = _flood_fill_background(np.array(rgb, dtype=np.float32), threshold, local_threshold)
     bg_pil = Image.fromarray((bg_mask * 255).astype(np.uint8), mode="L")
 
-    # Erode background mask inward to completely isolate hair lines
     for _ in range(edge_shrink):
         bg_pil = bg_pil.filter(ImageFilter.MinFilter(3))
 
@@ -96,48 +124,14 @@ def _remove_bg_numpy(
     for _ in range(feather_radius):
         feather_pil = feather_pil.filter(ImageFilter.MaxFilter(3))
 
-    # ── Stage 3: Soft-Alpha Edge Calculation ──────────────────────────────────
     blurred = feather_pil.filter(ImageFilter.GaussianBlur(radius=feather_radius * 0.4))
     alpha = ImageChops.invert(blurred)
-
-    eroded_arr = np.array(bg_pil, dtype=np.float32) / 255.0
-    alpha_arr  = np.array(alpha,  dtype=np.float32) / 255.0
-
-    # Guarantee absolute zones for subject interior vs background exterior
-    alpha_arr[eroded_arr > 0.85] = 0.0   # Clear Background
-    alpha_arr[eroded_arr < 0.02] = 1.0   # Pure Subject Interior
-
-    final_alpha = Image.fromarray((np.clip(alpha_arr, 0, 1) * 255).astype(np.uint8), mode="L")
     
-    # ── Stage 4: Authentic White Elliptical Aura Backing Generation ──────────
-    # Generates a soft vertical elliptical white vignette that transitions smoothly
-    # to complete transparency at its outer boundary to reveal the template pattern.
-    y, x = np.ogrid[:h, :w]
-    center_x, center_y = w / 2.0, h * 0.48  # Locks positioning right behind head & torso
-    
-    # Define accurate proportional aspect-locked radii for the vertical oval glow
-    rx, ry = w * 0.48, h * 0.52
-    ellipse_dist = np.sqrt(((x - center_x) / rx)**2 + ((y - center_y) / ry)**2)
-    
-    # Smoothstep mathematical falloff curve (3t² - 2t³) to prevent harsh edges
-    vignette = np.clip((ellipse_dist - 0.15) / 0.75, 0, 1)
-    vignette_smooth = 3 * vignette**2 - 2 * vignette**3
-    bg_alpha_arr = ((1.0 - vignette_smooth) * 255).astype(np.uint8)
-    
-    # Construct the pure white background aura with the soft elliptical alpha channel
-    white_aura = Image.new("RGBA", (w, h), (255, 255, 255, 255))
-    white_aura.putalpha(Image.fromarray(bg_alpha_arr, mode="L"))
-    
-    # ── Stage 5: Alpha Composition Stack Synthesis ───────────────────────────
-    # Isolate the subject into a clean independent layer using its soft-feathered alpha
+    # Isolate subject
     subject_layer = rgba.copy()
-    subject_layer.putalpha(final_alpha)
-    
-    # Superimpose the cutout subject directly onto the soft white aura layer
-    final_composite = Image.alpha_composite(white_aura, subject_layer)
-    
-    # CRITICAL: Return as RGBA so the outer transparency masks blend with the template canvas
-    return final_composite
+    subject_layer.putalpha(alpha)
+    return subject_layer
+
 
 def _flood_fill_background(arr: np.ndarray, tolerance: int, local_tolerance: int) -> np.ndarray:
     """
@@ -276,7 +270,6 @@ def debug_draw_relative_box(
     debug.save(f"DEBUG_{name}.jpg")
     
  
- 
 def _composite_element(
     canvas: Image.Image,
     element: Image.Image,
@@ -287,74 +280,45 @@ def _composite_element(
     strip_white: bool = False,
     stretch: bool = False,
     scale: float = 1.0,
-    is_main_photo: bool = False  # Added condition parameter for main photo styling
+    is_main_photo: bool = False 
 ) -> None:
-    """
-    Pastes assets while maintaining aspect ratios. Supports background stripping
-    and safe alpha channel transparency compositing layers.
-    """
-    x1, y1, x2, y2 = zone
-    x1, x2 = x1 + offset_x, x2 + offset_x
+    x1, y1, x2, y2 = [z + offset_x if i % 2 == 0 else z for i, z in enumerate(zone)]
     zw, zh = x2 - x1, y2 - y1
 
-    elem_copy = element.copy()
-    
-    # 1. Clean the white backgrounds upstream if requested
+    # 1. Prep element
+    elem = element.copy()
     if strip_white:
-        elem_copy = remove_white_background(elem_copy)
-
-    # 2. Execute geometric transformations safely over the alpha spectrum
+        elem = remove_white_background(elem)
     if rotate_deg:
-        elem_copy = elem_copy.rotate(rotate_deg, expand=True)
+        elem = elem.rotate(rotate_deg, expand=True)
 
-    # 3. Enforce proportional scale layout math
-    ew, eh = elem_copy.size
-
-    if stretch:
-        new_w = zw
-        new_h = zh
-        px = x1
-        py = y1
-    else:
-        ratio = min(zw / ew, zh / eh)
-        new_w = int(ew * ratio * scale)
-        new_h = int(eh * ratio * scale)
-        px = x1 + (zw - new_w) // 2
-        py = y1 + (zh - new_h) // 2
-
-    elem_copy = elem_copy.resize((new_w, new_h), Image.Resampling.LANCZOS)
+    # 2. Resize
+    ew, eh = elem.size
+    ratio = min(zw / ew, zh / eh) if not stretch else 1.0
+    nw, nh = (zw, zh) if stretch else (int(ew * ratio * scale), int(eh * ratio * scale))
+    elem = elem.resize((nw, nh), Image.Resampling.LANCZOS)
     if apply_sharpen:
-        elem_copy = elem_copy.filter(ImageFilter.SHARPEN)
-        
-    # 5. Composition Execution Matrix
-    if elem_copy.mode == "RGBA":
-        if is_main_photo:
-            # 🅰️ Generate a clean studio white background with a soft edge vignette
-            y, x = np.ogrid[:new_h, :new_w]
-            cx, cy = new_w / 2.0, new_h * 0.38  # Center point behind the head
-            dist = np.sqrt((x - cx)**2 + (y - cy)**2)
-            max_dist = np.sqrt(cx**2 + (new_h - cy)**2)
-            norm_dist = dist / max_dist if max_dist > 0 else dist
-            
-            # Light halo effect: Center stays pure white (255), outer corners fade smoothly to soft studio gray (232)
-            vig_arr = 255 - (norm_dist * 23)
-            vig_arr = np.clip(vig_arr, 232, 255).astype(np.uint8)
-            vig_img = Image.fromarray(vig_arr, mode="L")
-            photo_bg = Image.merge("RGBA", (vig_img, vig_img, vig_img, Image.new("L", (new_w, new_h), 255)))
-            
-            # 🅱️ Generate a smooth, professional drop shadow behind the subject cutout
-            alpha = elem_copy.split()[3]
-            shadow_mask = alpha.filter(ImageFilter.GaussianBlur(radius=max(3, int(new_w * 0.018))))
-            shadow_layer = Image.new("RGBA", (new_w, new_h), (50, 52, 60, 65)) # Smooth cool gray shadow
-            
-            # Composite the photo assembly layer: Background -> Drop Shadow -> Cutout Subject
-            bg_with_shadow = Image.composite(shadow_layer, photo_bg, shadow_mask)
-            elem_copy = Image.composite(elem_copy, bg_with_shadow, alpha)
+        elem = elem.filter(ImageFilter.SHARPEN)
 
-        canvas.paste(elem_copy, (px, py), mask=elem_copy.split()[3] if is_main_photo else elem_copy)
+    # 3. Placement
+    px = x1 + (zw - nw) // 2
+    py = y1 + (zh - nh) // 2
+
+    # 4. Composition (The critical fix)
+    if is_main_photo:
+        # Create staging canvas for the photo
+        photo_container = _get_oval_background((nw, nh))
+        # Add shadow (optional, based on your previous code)
+        alpha = elem.split()[3]
+        shadow_mask = alpha.filter(ImageFilter.GaussianBlur(radius=3))
+        shadow_layer = Image.new("RGBA", (nw, nh), (50, 52, 60, 65))
+        photo_container = Image.alpha_composite(photo_container, Image.composite(shadow_layer, Image.new("RGBA", (nw, nh), (0,0,0,0)), shadow_mask))
+        # Place subject on oval
+        final_photo = Image.alpha_composite(photo_container, elem)
+        canvas.paste(final_photo, (px, py), final_photo)
     else:
-        canvas.paste(elem_copy, (px, py))
-        
+        # Simple paste for smaller elements
+        canvas.paste(elem, (px, py), mask=elem if elem.mode == 'RGBA' else None)
         
 from PIL import Image, ImageFilter, ImageOps, ImageStat, ImageEnhance
 
